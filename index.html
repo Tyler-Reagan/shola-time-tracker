@@ -1,21 +1,80 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
+    <link rel="apple-touch-icon" sizes="180x180" href="/favicons/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicons/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicons/favicon-16x16.png">
+    <link rel="manifest" href="/favicons/site.webmanifest">
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Work Time Calculators</title>
+    <title>Calculators</title>
     <style>
       body {
         font-family: Arial, sans-serif;
         display: flex;
-        flex-direction: column; /* Arrange content vertically */
-        justify-content: center;
+        flex-direction: column;
+        justify-content: flex-start; /* Align content to the top */
         align-items: center;
         min-height: 100vh;
         background-color: #f4f4f4;
         margin: 0;
-        padding: 20px; /* Add some padding around the content */
-        box-sizing: border-box; /* Include padding in element's total width and height */
+        padding: 0; /* Remove body padding, containers will manage it */
+        box-sizing: border-box;
+      }
+
+      /* Navigation Bar (Tabs) */
+      nav {
+        width: 100%;
+        background-color: #333;
+        padding: 10px 0;
+        text-align: center;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        margin-bottom: 20px; /* Space below the nav bar */
+      }
+
+      nav ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: flex;
+        justify-content: center;
+      }
+
+      nav li {
+        margin: 0 15px;
+      }
+
+      nav a {
+        color: white;
+        text-decoration: none;
+        padding: 8px 15px;
+        border-radius: 5px;
+        transition: background-color 0.3s ease;
+      }
+
+      nav a.active,
+      nav a:hover {
+        background-color: #007bff;
+      }
+
+      /* Main Content Area */
+      .content-wrapper {
+        width: 100%;
+        max-width: 900px; /* Max width for content, to keep it readable */
+        padding: 0 20px; /* Padding for the wrapper itself */
+        box-sizing: border-box;
+      }
+
+      .page-section {
+        display: none; /* Hidden by default */
+        width: 100%;
+        /* You might want specific styles for each page, or common container styles */
+        flex-direction: column; /* Ensure inner content stacks */
+        align-items: center;
+      }
+
+      .page-section.active {
+        display: flex; /* Show active page */
       }
 
       .container {
@@ -24,8 +83,8 @@
         border-radius: 8px;
         box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
         width: 100%;
-        max-width: 400px;
-        margin-bottom: 25px; /* Space between the two containers */
+        max-width: 400px; /* Limit width of forms */
+        margin-bottom: 25px; /* Space between forms/containers */
       }
 
       h1,
@@ -47,7 +106,8 @@
       }
 
       input[type="time"],
-      input[type="number"] {
+      input[type="number"],
+      input[type="text"] {
         width: calc(100% - 20px);
         padding: 10px;
         border: 1px solid #ddd;
@@ -78,96 +138,177 @@
         color: #333;
         font-weight: bold;
       }
+
+      /* Discount Table Styles */
+      .discount-table-container {
+        width: 100%;
+        max-width: 600px; /* Wider for the table */
+        margin-top: 25px;
+        margin-bottom: 25px;
+        overflow-x: auto; /* For small screens */
+      }
+
+      .discount-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 15px;
+      }
+
+      .discount-table th,
+      .discount-table td {
+        border: 1px solid #ddd;
+        padding: 10px;
+        text-align: left;
+      }
+
+      .discount-table th {
+        background-color: #f2f2f2;
+        font-weight: bold;
+      }
     </style>
   </head>
   <body>
-    <h1>Work Time Calculators</h1>
+    <nav>
+      <ul>
+        <li><a href="#workCalculator" class="tab-link active">Work Calculator</a></li>
+        <li><a href="#discountCalculator" class="tab-link">Discount Calculator</a></li>
+      </ul>
+    </nav>
 
-    <!-- Clock Out Calculator Form -->
-    <div class="container">
-      <h2>Clock Out Calculator</h2>
-      <form id="clockOutForm">
-        <div class="form-group">
-          <label for="clockInTime">Clock In Time:</label>
-          <input type="time" id="clockInTime" name="clockInTime" required />
+    <div class="content-wrapper">
+      <!-- Work Calculator Page Section -->
+      <div id="workCalculator" class="page-section active">
+        <h1>Work Time Calculators</h1>
+
+        <!-- Clock Out Calculator Form -->
+        <div class="container">
+          <h2>Clock Out Calculator</h2>
+          <form id="clockOutForm">
+            <div class="form-group">
+              <label for="clockInTime">Clock In Time:</label>
+              <input
+                type="time"
+                id="clockInTime"
+                name="clockInTime"
+                required
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="lunchBreak">Lunch Break (minutes):</label>
+              <input
+                type="number"
+                id="lunchBreak"
+                name="lunchBreak"
+                value="60"
+                min="0"
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="extraBreak">Extra Break (minutes):</label>
+              <input
+                type="number"
+                id="extraBreak"
+                name="extraBreak"
+                value="0"
+                min="0"
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="desiredHoursWorked">Desired Hours Worked:</label>
+              <input
+                type="number"
+                id="desiredHoursWorked"
+                name="desiredHoursWorked"
+                value="8"
+                min="0"
+                step="0.5"
+              />
+            </div>
+
+            <button type="submit">Calculate Clock Out Time</button>
+          </form>
+
+          <div id="clockOutResult" class="result"></div>
         </div>
 
-        <div class="form-group">
-          <label for="lunchBreak">Lunch Break (minutes):</label>
-          <input
-            type="number"
-            id="lunchBreak"
-            name="lunchBreak"
-            value="30"
-            min="0"
-          />
+        <!-- Lunch Break End Time Calculator Form -->
+        <div class="container">
+          <h2>Lunch End Time Calculator</h2>
+          <form id="lunchEndForm">
+            <div class="form-group">
+              <label for="lunchStartTime">Lunch Start Time:</label>
+              <input
+                type="time"
+                id="lunchStartTime"
+                name="lunchStartTime"
+                required
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="lunchBreakLength">Lunch Break Length (minutes):</label>
+              <input
+                type="number"
+                id="lunchBreakLength"
+                name="lunchBreakLength"
+                value="60"
+                min="0"
+              />
+            </div>
+
+            <button type="submit">Calculate Lunch End Time</button>
+          </form>
+
+          <div id="lunchEndResult" class="result"></div>
         </div>
+      </div>
 
-        <div class="form-group">
-          <label for="extraBreak">Extra Break (minutes):</label>
-          <input
-            type="number"
-            id="extraBreak"
-            name="extraBreak"
-            value="0"
-            min="0"
-          />
+      <!-- Discount Calculator Page Section -->
+      <div id="discountCalculator" class="page-section">
+        <h1>Discount Calculator</h1>
+
+        <div class="container">
+          <h2>Price Discount Table</h2>
+          <form id="discountForm">
+            <div class="form-group">
+              <label for="originalPrice">Original Price ($):</label>
+              <input
+                type="number"
+                id="originalPrice"
+                name="originalPrice"
+                min="0"
+                step="0.01"
+                required
+              />
+            </div>
+            <button type="submit">Generate Discount Table</button>
+          </form>
+
+          <div class="discount-table-container" id="discountTableContainer">
+            <!-- Discount table will be inserted here by JavaScript -->
+          </div>
         </div>
-
-        <div class="form-group">
-          <label for="desiredHoursWorked">Desired Hours Worked:</label>
-          <input
-            type="number"
-            id="desiredHoursWorked"
-            name="desiredHoursWorked"
-            value="8"
-            min="0"
-            step="0.5"
-          />
-        </div>
-
-        <button type="submit">Calculate Clock Out Time</button>
-      </form>
-
-      <div id="clockOutResult" class="result"></div>
+      </div>
     </div>
-
-    <!-- Lunch Break End Time Calculator Form -->
-    <div class="container">
-      <h2>Lunch End Time Calculator</h2>
-      <form id="lunchEndForm">
-        <div class="form-group">
-          <label for="lunchStartTime">Lunch Start Time:</label>
-          <input
-            type="time"
-            id="lunchStartTime"
-            name="lunchStartTime"
-            required
-          />
-        </div>
-
-        <div class="form-group">
-          <label for="lunchBreakLength">Lunch Break Length (minutes):</label>
-          <input
-            type="number"
-            id="lunchBreakLength"
-            name="lunchBreakLength"
-            value="30"
-            min="0"
-          />
-        </div>
-
-        <button type="submit">Calculate Lunch End Time</button>
-      </form>
-
-      <div id="lunchEndResult" class="result"></div>
-    </div>
+    <!-- End content-wrapper -->
 
     <script type="module">
+      // --- Constants ---
+      const SAN_DIEGO_SALES_TAX_RATE = 0.0775; // 7.75% for San Diego, CA - as of 8/18/25
+      const DISCOUNT_INCREMENTS = [
+        5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85,
+        90, 95,
+      ];
+
+      // --- Helper Functions ---
+
       /**
        * Sets the default value of the clock-in time input to the current time.
        */
-      function setDefaultClockInTime() {
+      function setDefaultClockInInTime() {
         const now = new Date();
         const hours = String(now.getHours()).padStart(2, "0");
         const minutes = String(now.getMinutes()).padStart(2, "0");
@@ -202,6 +343,8 @@
           return [String(hourVal), amSuffix]; // No padStart needed for 1-11
         }
       }
+
+      // --- Work Calculator Functions ---
 
       /**
        * Calculates the clock-out time based on provided parameters.
@@ -318,10 +461,106 @@
         }
       }
 
-      // Initialize the forms when the DOM is fully loaded
-      document.addEventListener("DOMContentLoaded", () => {
-        setDefaultClockInTime(); // Set initial time for both clock-in and lunch start
+      // --- Discount Calculator Functions ---
 
+      /**
+       * Calculates discounted price and price with tax for San Diego.
+       * @param {number} originalPrice - The original price.
+       * @param {number} discountPercent - The discount percentage (e.g., 10 for 10%).
+       * @returns {{discountedPrice: number, priceWithTax: number}} Object with calculated prices.
+       */
+      function calculateDiscountedPrice(originalPrice, discountPercent) {
+        const discountFactor = 1 - discountPercent / 100;
+        const discountedPrice = originalPrice * discountFactor;
+        const priceWithTax = discountedPrice * (1 + SAN_DIEGO_SALES_TAX_RATE);
+        return { discountedPrice, priceWithTax };
+      }
+
+      /**
+       * Generates and displays the discount table.
+       * @param {Event} event - The form submission event.
+       */
+      function handleDiscountFormSubmit(event) {
+        event.preventDefault();
+
+        const originalPriceInput = document.getElementById("originalPrice");
+        const originalPrice = parseFloat(originalPriceInput.value);
+
+        if (isNaN(originalPrice) || originalPrice < 0) {
+          alert("Please enter a valid positive number for the original price.");
+          return;
+        }
+
+        const tableContainer = document.getElementById("discountTableContainer");
+        tableContainer.innerHTML = ""; // Clear previous table
+
+        const table = document.createElement("table");
+        table.classList.add("discount-table");
+        const thead = table.createTHead();
+        const tbody = table.createTBody();
+
+        // Create table header
+        const headerRow = thead.insertRow();
+        ["Discount %", "Price After Discount ($)", "Price with Tax ($)"].forEach((text) => {
+          const th = document.createElement("th");
+          th.textContent = text;
+          headerRow.appendChild(th);
+        });
+
+        // Populate table body
+        DISCOUNT_INCREMENTS.forEach((discountPercent) => {
+          const { discountedPrice, priceWithTax } = calculateDiscountedPrice(
+            originalPrice,
+            discountPercent
+          );
+
+          const row = tbody.insertRow();
+          const discountCell = row.insertCell();
+          discountCell.textContent = `${discountPercent}%`;
+
+          const priceAfterDiscountCell = row.insertCell();
+          priceAfterDiscountCell.textContent = discountedPrice.toFixed(2); // Format to 2 decimal places
+
+          const priceWithTaxCell = row.insertCell();
+          priceWithTaxCell.textContent = priceWithTax.toFixed(2); // Format to 2 decimal places
+        });
+
+        tableContainer.appendChild(table);
+      }
+
+      // --- Tab Navigation Functions ---
+
+      /**
+       * Shows the selected tab content and updates active link styling.
+       * @param {string} tabId - The ID of the content section to show (e.g., "workCalculator").
+       */
+      function showTab(tabId) {
+        // Hide all page sections
+        document.querySelectorAll(".page-section").forEach((section) => {
+          section.classList.remove("active");
+        });
+
+        // Show the selected page section
+        const activeSection = document.getElementById(tabId);
+        if (activeSection) {
+          activeSection.classList.add("active");
+        }
+
+        // Update active class on tab links
+        document.querySelectorAll(".tab-link").forEach((link) => {
+          link.classList.remove("active");
+          if (link.getAttribute("href") === `#${tabId}`) {
+            link.classList.add("active");
+          }
+        });
+      }
+
+      // --- Initialization ---
+      document.addEventListener("DOMContentLoaded", () => {
+        // Set default times on load
+        setDefaultClockInInTime();
+
+        // Attach event listeners for Work Calculator forms
         const clockOutForm = document.getElementById("clockOutForm");
         if (clockOutForm) {
           clockOutForm.addEventListener("submit", handleClockOutSubmit);
@@ -331,6 +570,24 @@
         if (lunchEndForm) {
           lunchEndForm.addEventListener("submit", handleLunchBreakSubmit);
         }
+
+        // Attach event listener for Discount Calculator form
+        const discountForm = document.getElementById("discountForm");
+        if (discountForm) {
+          discountForm.addEventListener("submit", handleDiscountFormSubmit);
+        }
+
+        // Attach event listeners for tab navigation
+        document.querySelectorAll(".tab-link").forEach((link) => {
+          link.addEventListener("click", (event) => {
+            event.preventDefault(); // Prevent default link behavior (page jump)
+            const tabId = event.target.getAttribute("href").substring(1); // Get ID from href (e.g., "workCalculator")
+            showTab(tabId);
+          });
+        });
+
+        // Show the default tab (Work Calculator) on initial load
+        showTab("workCalculator");
       });
     </script>
   </body>
