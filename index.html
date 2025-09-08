@@ -105,6 +105,14 @@
         font-weight: bold;
       }
 
+      .inline-opt {
+        float: right;
+        font-weight: normal;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+
       input[type="time"],
       input[type="number"],
       input[type="text"] {
@@ -137,6 +145,19 @@
         font-size: 1.2em;
         color: #333;
         font-weight: bold;
+      }
+
+      /* Informational banners */
+      .info-banner {
+        width: 100%;
+        max-width: 400px;
+        margin-top: 10px;
+        padding: 10px 12px;
+        border-radius: 6px;
+        background-color: #fff7e6;
+        border: 1px solid #ffe2a8;
+        color: #805300;
+        display: none;
       }
 
       /* Discount Table Styles */
@@ -221,6 +242,34 @@
         display: flex;
         gap: 10px;
       }
+
+      /* Toasts */
+      #toastContainer {
+        position: fixed;
+        left: 50%;
+        bottom: 24px;
+        transform: translateX(-50%);
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        z-index: 9999;
+        pointer-events: none;
+      }
+
+      .toast {
+        min-width: 260px;
+        max-width: 90vw;
+        padding: 10px 14px;
+        border-radius: 6px;
+        color: #123;
+        background: #eef5ff;
+        border: 1px solid #cfe3ff;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        pointer-events: auto;
+      }
+
+      .toast-success { background: #eaffea; border-color: #c8f0c8; color: #174d17; }
+      .toast-error { background: #ffecec; border-color: #ffc7c7; color: #7a1a1a; }
     </style>
   </head>
   <body>
@@ -241,7 +290,7 @@
           <h2>Clock Out Calculator</h2>
           <form id="clockOutForm">
             <div class="form-group">
-              <label for="clockInTime">Clock In Time:</label>
+              <label for="clockInTime">Clock In Time: </label>
               <input
                 type="time"
                 id="clockInTime"
@@ -284,10 +333,17 @@
               />
             </div>
 
-            <button type="submit">Calculate Clock Out Time</button>
+            <button type="submit" style="margin-bottom: 10px;">Calculate Clock Out Time</button>
+
+            <!-- Feature flag: hide SMS opt-in for now -->
+            <!-- <span class="opt">
+              <input type="checkbox" id="clockOutSmsOptIn" />
+              Receive a text reminder to clock out
+            </span> -->
           </form>
 
           <div id="clockOutResult" class="result"></div>
+          <div id="clockOutBanner" class="info-banner"></div>
         </div>
 
         <!-- Lunch Break End Time Calculator Form -->
@@ -295,7 +351,7 @@
           <h2>Lunch End Time Calculator</h2>
           <form id="lunchEndForm">
             <div class="form-group">
-              <label for="lunchStartTime">Lunch Start Time:</label>
+              <label for="lunchStartTime">Lunch Start Time: </label>
               <input
                 type="time"
                 id="lunchStartTime"
@@ -315,7 +371,13 @@
               />
             </div>
 
-            <button type="submit">Calculate Lunch End Time</button>
+            <button type="submit" style="margin-bottom: 10px;">Calculate Lunch End Time</button>
+
+            <!-- Feature flag: hide SMS opt-in for now -->
+            <!-- <span class="opt">
+              <input type="checkbox" id="lunchEndSmsOptIn" />
+              Receive a text reminder to end lunch
+            </span> -->
           </form>
 
           <div id="lunchEndResult" class="result"></div>
@@ -367,6 +429,10 @@
         5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85,
         90, 95,
       ];
+      // Optional: configure your SMS scheduling endpoint (e.g., API Gateway or Twilio Function HTTP URL)
+      const SMS_SCHEDULER_ENDPOINT = ""; // e.g., "https://abc123.execute-api.us-east-1.amazonaws.com/prod/schedule-sms"
+      // Single-user hard-coded destination number (E.164)
+      const REMINDER_PHONE_NUMBER = "+16198893118";
 
       // --- Helper Functions ---
 
@@ -476,6 +542,28 @@
         if (resultElement) {
           resultElement.textContent = `You should clock out at: ${calculatedClockOutTime}`;
         }
+
+        // Show lunch break banner: 6 hours from submitted clock-in time
+        const [inHours, inMinutes] = clockInTimeStr.split(":").map(Number);
+        const startDate = new Date();
+        startDate.setHours(inHours, inMinutes, 0, 0);
+        const sixHoursMs = 6 * 60 * 60 * 1000;
+        const lunchByDate = new Date(startDate.getTime() + sixHoursMs);
+        const [bannerHours, bannerSuffix] = format24ToAmerican(lunchByDate.getHours());
+        const bannerMinutes = String(lunchByDate.getMinutes()).padStart(2, "0");
+        const lunchByStr = `${bannerHours}:${bannerMinutes} ${bannerSuffix}`;
+        const bannerEl = document.getElementById("clockOutBanner");
+        if (bannerEl) {
+          bannerEl.textContent = `Take your lunch break by ${lunchByStr}`;
+          bannerEl.style.display = "block";
+        }
+
+        // Optionally schedule reminder via SMS/local notification for clock out
+        maybeScheduleReminder({
+          checkId: "clockOutSmsOptIn",
+          whenDate: lunchByDate,
+          actionDescription: "take your lunch break",
+        });
       }
 
       /**
@@ -524,6 +612,17 @@
         if (resultElement) {
           resultElement.textContent = `You should end lunch at: ${calculatedLunchBreakEndTime}`;
         }
+
+        // Optionally schedule reminder via SMS/local notification for lunch end
+        const [lsHours, lsMinutes] = lunchStartTimeStr.split(":").map(Number);
+        const base = new Date();
+        base.setHours(lsHours, lsMinutes, 0, 0);
+        const endDate = new Date(base.getTime() + lunchMinutes * 60 * 1000);
+        maybeScheduleReminder({
+          checkId: "lunchEndSmsOptIn",
+          whenDate: endDate,
+          actionDescription: "end your lunch",
+        });
       }
 
       // --- Discount Calculator Functions ---
@@ -646,6 +745,96 @@
         btn.textContent = `Generate From Sum ($${sum.toFixed(2)})`;
       }
 
+      // --- Reminder utilities ---
+      function maybeScheduleReminder({ checkId, whenDate, actionDescription }) {
+        const chk = document.getElementById(checkId);
+        if (!chk || !chk.checked) return;
+        const phone = REMINDER_PHONE_NUMBER;
+        // Fire-and-forget: attempt SMS via webhook if configured, else fallback to local notification
+        trySendSmsReminder(phone, whenDate, actionDescription);
+        tryScheduleLocalNotification(whenDate, actionDescription);
+      }
+
+      function trySendSmsReminder(phoneNumber, whenDate, actionDescription) {
+        if (!phoneNumber) return;
+        if (!SMS_SCHEDULER_ENDPOINT) return; // Not configured
+        // POST to your backend SMS service (e.g., Twilio via Lambda/API GW or Twilio Functions)
+        const payload = {
+          phoneNumber,
+          whenIso: whenDate.toISOString(),
+          message: `Reminder: ${actionDescription} at ${formatTimeForMessage(whenDate)}`,
+        };
+        fetch(SMS_SCHEDULER_ENDPOINT, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        })
+          .then(async (res) => {
+            if (res.ok) {
+              showToast("Text reminder scheduled", "success");
+            } else {
+              const text = await res.text();
+              showToast(`Text reminder scheduling failed: ${text || res.status}`, "error");
+            }
+          })
+          .catch(() => {
+            showToast("Network error scheduling SMS", "error");
+          });
+      }
+
+      function tryScheduleLocalNotification(whenDate, actionDescription) {
+        if (!("Notification" in window)) return;
+        if (Notification.permission === "granted") {
+          scheduleNotification(whenDate, actionDescription);
+        } else if (Notification.permission !== "denied") {
+          Notification.requestPermission().then((permission) => {
+            if (permission === "granted") {
+              scheduleNotification(whenDate, actionDescription);
+            }
+          });
+        }
+      }
+
+      function scheduleNotification(whenDate, actionDescription) {
+        const delayMs = Math.max(0, whenDate.getTime() - Date.now());
+        setTimeout(() => {
+          new Notification("Reminder", {
+            body: `It's time to ${actionDescription}.`,
+          });
+        }, delayMs);
+      }
+
+      function formatTimeForMessage(dateObj) {
+        const [h, suffix] = format24ToAmerican(dateObj.getHours());
+        const m = String(dateObj.getMinutes()).padStart(2, "0");
+        return `${h}:${m} ${suffix}`;
+      }
+
+      function isValidE164(phone) {
+        // E.164: + followed by 8 to 15 digits (country code + subscriber number)
+        return /^\+[1-9]\d{7,14}$/.test(phone);
+      }
+
+      // --- Toasts ---
+      function ensureToastContainer() {
+        let c = document.getElementById("toastContainer");
+        if (!c) {
+          c = document.createElement("div");
+          c.id = "toastContainer";
+          document.body.appendChild(c);
+        }
+        return c;
+      }
+
+      function showToast(message, type = "success", timeoutMs = 3500) {
+        const container = ensureToastContainer();
+        const el = document.createElement("div");
+        el.className = `toast toast-${type}`;
+        el.textContent = message;
+        container.appendChild(el);
+        setTimeout(() => el.remove(), timeoutMs);
+      }
+
       // --- Tab Navigation Functions ---
 
       /**
@@ -718,6 +907,9 @@
           });
           updateGenerateFromSumLabel();
         }
+
+        // Ensure toast container exists on load
+        ensureToastContainer();
 
         // Attach event listeners for tab navigation
         document.querySelectorAll(".tab-link").forEach((link) => {
