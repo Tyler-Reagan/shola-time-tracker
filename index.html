@@ -165,6 +165,62 @@
         background-color: #f2f2f2;
         font-weight: bold;
       }
+
+      /* Chips UI for Discounted Prices */
+      .chips-wrapper {
+        width: 100%;
+        max-width: 600px;
+        margin-top: 10px;
+      }
+
+      .chip-input-row {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 10px;
+        align-items: center;
+      }
+
+      .chip-input-row input[type="number"] {
+        flex: 1;
+      }
+
+      .chips-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 8px 0 12px 0;
+      }
+
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 10px;
+        background-color: #e0f0ff;
+        color: #084d88;
+        border: 1px solid #b9ddff;
+        border-radius: 16px;
+        font-size: 14px;
+      }
+
+      .chip-remove {
+        display: inline-flex;
+        width: 18px;
+        height: 18px;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        background-color: #cde6ff;
+        color: #084d88;
+        cursor: pointer;
+        user-select: none;
+        font-weight: bold;
+      }
+
+      .chips-actions {
+        display: flex;
+        gap: 10px;
+      }
     </style>
   </head>
   <body>
@@ -271,7 +327,7 @@
         <h1>Discount Calculator</h1>
 
         <div class="container">
-          <h2>Price Discount Table</h2>
+          <h2>Discount Table Generator</h2>
           <form id="discountForm">
             <div class="form-group">
               <label for="originalPrice">Original Price ($):</label>
@@ -286,6 +342,15 @@
             </div>
             <button type="submit">Generate Discount Table</button>
           </form>
+
+          <!-- Chips UI: List of prices and actions -->
+          <div class="chips-wrapper">
+            <div id="chipsContainer" class="chips-container"></div>
+            <div class="chips-actions">
+              <button id="clearChipsBtn" type="button">Clear Prices</button>
+              <button id="generateFromSumBtn" type="button">Total Discounted Price</button>
+            </div>
+          </div>
 
           <div class="discount-table-container" id="discountTableContainer">
             <!-- Discount table will be inserted here by JavaScript -->
@@ -482,24 +547,41 @@
        */
       function handleDiscountFormSubmit(event) {
         event.preventDefault();
-
         const originalPriceInput = document.getElementById("originalPrice");
         const originalPrice = parseFloat(originalPriceInput.value);
-
         if (isNaN(originalPrice) || originalPrice < 0) {
           alert("Please enter a valid positive number for the original price.");
           return;
         }
 
+        // Persist this entry as a chip and generate table for it
+        chipPrices.push(originalPrice);
+        renderChips();
+        generateDiscountTableForPrice(originalPrice);
+
+        // Clear and refocus input after successful submission
+        originalPriceInput.value = "";
+        originalPriceInput.focus();
+      }
+
+      /**
+       * Renders the discount table for a given price value.
+       * @param {number} priceValue - The base price to generate the table from.
+       */
+      function generateDiscountTableForPrice(priceValue) {
+        if (isNaN(priceValue) || priceValue < 0) {
+          alert("Please enter a valid positive number for the original price.");
+          return;
+        }
+
         const tableContainer = document.getElementById("discountTableContainer");
-        tableContainer.innerHTML = ""; // Clear previous table
+        tableContainer.innerHTML = "";
 
         const table = document.createElement("table");
         table.classList.add("discount-table");
         const thead = table.createTHead();
         const tbody = table.createTBody();
 
-        // Create table header
         const headerRow = thead.insertRow();
         ["Discount %", "Price After Discount ($)", "Price with Tax ($)"].forEach((text) => {
           const th = document.createElement("th");
@@ -507,10 +589,9 @@
           headerRow.appendChild(th);
         });
 
-        // Populate table body
         DISCOUNT_INCREMENTS.forEach((discountPercent) => {
           const { discountedPrice, priceWithTax } = calculateDiscountedPrice(
-            originalPrice,
+            priceValue,
             discountPercent
           );
 
@@ -519,13 +600,50 @@
           discountCell.textContent = `${discountPercent}%`;
 
           const priceAfterDiscountCell = row.insertCell();
-          priceAfterDiscountCell.textContent = discountedPrice.toFixed(2); // Format to 2 decimal places
+          priceAfterDiscountCell.textContent = discountedPrice.toFixed(2);
 
           const priceWithTaxCell = row.insertCell();
-          priceWithTaxCell.textContent = priceWithTax.toFixed(2); // Format to 2 decimal places
+          priceWithTaxCell.textContent = priceWithTax.toFixed(2);
         });
 
         tableContainer.appendChild(table);
+      }
+
+      // --- Chips State and Helpers ---
+      const chipPrices = [];
+
+      function renderChips() {
+        const chipsContainer = document.getElementById("chipsContainer");
+        chipsContainer.innerHTML = "";
+        chipPrices.forEach((value, index) => {
+          const chip = document.createElement("span");
+          chip.className = "chip";
+          chip.innerHTML = `$${value.toFixed(2)} <span class="chip-remove" data-index="${index}" aria-label="Remove">×</span>`;
+          chipsContainer.appendChild(chip);
+        });
+        updateGenerateFromSumLabel();
+      }
+
+      function removeChipAt(index) {
+        if (index < 0 || index >= chipPrices.length) return;
+        chipPrices.splice(index, 1);
+        renderChips();
+      }
+
+      function clearAllChips() {
+        chipPrices.length = 0;
+        renderChips();
+      }
+
+      function sumChips() {
+        return chipPrices.reduce((acc, n) => acc + n, 0);
+      }
+
+      function updateGenerateFromSumLabel() {
+        const btn = document.getElementById("generateFromSumBtn");
+        if (!btn) return;
+        const sum = sumChips();
+        btn.textContent = `Generate From Sum ($${sum.toFixed(2)})`;
       }
 
       // --- Tab Navigation Functions ---
@@ -575,6 +693,30 @@
         const discountForm = document.getElementById("discountForm");
         if (discountForm) {
           discountForm.addEventListener("submit", handleDiscountFormSubmit);
+        }
+
+        // Chip UI events
+        const chipsContainer = document.getElementById("chipsContainer");
+        if (chipsContainer) {
+          chipsContainer.addEventListener("click", (e) => {
+            const target = e.target;
+            if (target && target.classList && target.classList.contains("chip-remove")) {
+              const idx = parseInt(target.getAttribute("data-index"));
+              removeChipAt(idx);
+            }
+          });
+        }
+        const clearChipsBtn = document.getElementById("clearChipsBtn");
+        if (clearChipsBtn) {
+          clearChipsBtn.addEventListener("click", clearAllChips);
+        }
+        const generateFromSumBtn = document.getElementById("generateFromSumBtn");
+        if (generateFromSumBtn) {
+          generateFromSumBtn.addEventListener("click", () => {
+            const sum = sumChips();
+            generateDiscountTableForPrice(sum);
+          });
+          updateGenerateFromSumLabel();
         }
 
         // Attach event listeners for tab navigation
