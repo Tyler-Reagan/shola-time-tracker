@@ -1,0 +1,38 @@
+{
+  "name": "shola-time-tracker",
+  "version": "1.0.0",
+  "description": "This app provides Work Time calculators and a Discount calculator. It is a static site (S3/GitHub Pages compatible) with optional SMS reminders using AWS and Twilio.",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Tyler-Reagan/shola-time-tracker.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/Tyler-Reagan/shola-time-tracker/issues"
+  },
+  "homepage": "https://github.com/Tyler-Reagan/shola-time-tracker#readme",
+  "devDependencies": {
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.2",
+    "@vitejs/plugin-react": "^5.0.4",
+    "autoprefixer": "^10.4.21",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.1.16",
+    "typescript": "^5.9.3",
+    "vite": "^7.1.12"
+  },
+  "dependencies": {
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  }
+}
