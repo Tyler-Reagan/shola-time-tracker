@@ -9,6 +9,7 @@ export interface DayState {
   entries: TimeEntry[];
   startTime?: Date;
   endTime?: Date;
+  dayDate?: Date; // Static date set when the day starts
 }
 
 export interface DiscountCalculation {
