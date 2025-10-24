@@ -22,19 +22,14 @@ build:
 	npm run build
 	@echo "Build complete! Files are in ./docs/"
 
-# Deploy: build and commit with custom message
+# Deploy: build and commit with generic message
 deploy:
-ifndef MESSAGE
-	@echo "Error: MESSAGE is required"
-	@echo "Usage: make deploy MESSAGE='your commit message here'"
-	@exit 1
-endif
 	@echo "Building project..."
 	npm run build
 	@echo "Adding docs/ to git..."
 	git add docs/
-	@echo "Committing with message: $(MESSAGE)"
-	git commit -m "$(MESSAGE)"
+	@echo "Committing with generic deploy message..."
+	git commit -m "Deploy build files for GitHub Pages"
 	@echo "Pushing to origin..."
 	git push
 	@echo "Deployment complete! Your changes should be live on GitHub Pages shortly."
