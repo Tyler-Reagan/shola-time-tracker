@@ -6,7 +6,7 @@ export default defineConfig({
   plugins: [react()],
   base: "/shola-time-tracker/", // GitHub Pages base path
   build: {
-    outDir: "dist",
+    outDir: "docs",
     assetsDir: "assets",
   },
 });
