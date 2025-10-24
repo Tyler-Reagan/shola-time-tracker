@@ -1,5 +1,5 @@
 {
-  "name": "shola-time-tracker",
+  "name": "shola-apps",
   "version": "1.0.0",
   "description": "This app provides Work Time calculators and a Discount calculator. It is a static site (S3/GitHub Pages compatible) with optional SMS reminders using AWS and Twilio.",
   "main": "index.js",
