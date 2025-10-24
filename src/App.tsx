@@ -28,16 +28,84 @@ const darkTheme = createTheme({
   },
   typography: {
     fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+    h1: {
+      fontSize: "2rem",
+      fontWeight: 700,
+      "@media (min-width:600px)": {
+        fontSize: "2.5rem",
+      },
+    },
+    h2: {
+      fontSize: "1.75rem",
+      fontWeight: 600,
+      "@media (min-width:600px)": {
+        fontSize: "2rem",
+      },
+    },
+    h3: {
+      fontSize: "1.5rem",
+      fontWeight: 600,
+      "@media (min-width:600px)": {
+        fontSize: "1.75rem",
+      },
+    },
+    h4: {
+      fontSize: "1.25rem",
+      fontWeight: 600,
+      "@media (min-width:600px)": {
+        fontSize: "1.5rem",
+      },
+    },
+    h5: {
+      fontSize: "1.125rem",
+      fontWeight: 600,
+      "@media (min-width:600px)": {
+        fontSize: "1.25rem",
+      },
+    },
+    h6: {
+      fontSize: "1rem",
+      fontWeight: 600,
+      "@media (min-width:600px)": {
+        fontSize: "1.125rem",
+      },
+    },
+    body1: {
+      fontSize: "0.875rem",
+      "@media (min-width:600px)": {
+        fontSize: "1rem",
+      },
+    },
+    body2: {
+      fontSize: "0.75rem",
+      "@media (min-width:600px)": {
+        fontSize: "0.875rem",
+      },
+    },
+  },
+  breakpoints: {
+    values: {
+      xs: 0,
+      sm: 600,
+      md: 900,
+      lg: 1200,
+      xl: 1536,
+    },
   },
   shape: {
-    borderRadius: 12, // Default border radius for all components
+    borderRadius: 8, // Reduced border radius for mobile
   },
   components: {
     // Card component styling
     MuiCard: {
       styleOverrides: {
         root: {
-          borderRadius: 16,
+          borderRadius: 8,
+          margin: "8px 0",
+          "@media (min-width:600px)": {
+            borderRadius: 12,
+            margin: "16px 0",
+          },
         },
       },
     },
@@ -45,8 +113,15 @@ const darkTheme = createTheme({
     MuiButton: {
       styleOverrides: {
         root: {
-          borderRadius: 10,
-          textTransform: "none", // Remove uppercase transformation
+          borderRadius: 6,
+          textTransform: "none",
+          minHeight: 44, // Touch-friendly minimum height
+          padding: "8px 16px",
+          "@media (min-width:600px)": {
+            borderRadius: 8,
+            minHeight: 36,
+            padding: "6px 16px",
+          },
         },
       },
     },
@@ -55,7 +130,12 @@ const darkTheme = createTheme({
       styleOverrides: {
         root: {
           "& .MuiOutlinedInput-root": {
-            borderRadius: 10,
+            borderRadius: 6,
+            minHeight: 44,
+            "@media (min-width:600px)": {
+              borderRadius: 8,
+              minHeight: 40,
+            },
           },
         },
       },
@@ -64,7 +144,12 @@ const darkTheme = createTheme({
     MuiChip: {
       styleOverrides: {
         root: {
-          borderRadius: 8,
+          borderRadius: 6,
+          height: 32,
+          "@media (min-width:600px)": {
+            borderRadius: 8,
+            height: 28,
+          },
         },
       },
     },
@@ -72,7 +157,23 @@ const darkTheme = createTheme({
     MuiTableContainer: {
       styleOverrides: {
         root: {
-          borderRadius: 12,
+          borderRadius: 8,
+          "@media (min-width:600px)": {
+            borderRadius: 12,
+          },
+        },
+      },
+    },
+    // Table cell styling for mobile
+    MuiTableCell: {
+      styleOverrides: {
+        root: {
+          padding: "8px 12px",
+          fontSize: "0.75rem",
+          "@media (min-width:600px)": {
+            padding: "12px 16px",
+            fontSize: "0.875rem",
+          },
         },
       },
     },
@@ -80,7 +181,10 @@ const darkTheme = createTheme({
     MuiAlert: {
       styleOverrides: {
         root: {
-          borderRadius: 12,
+          borderRadius: 8,
+          "@media (min-width:600px)": {
+            borderRadius: 12,
+          },
         },
       },
     },
@@ -88,7 +192,7 @@ const darkTheme = createTheme({
     MuiAppBar: {
       styleOverrides: {
         root: {
-          borderRadius: 0, // Keep AppBar square
+          borderRadius: 0,
         },
       },
     },
@@ -96,8 +200,29 @@ const darkTheme = createTheme({
     MuiTab: {
       styleOverrides: {
         root: {
-          borderRadius: 8,
-          margin: "0 4px",
+          borderRadius: 6,
+          margin: "2px 4px",
+          minHeight: 48,
+          fontSize: "0.875rem",
+          "@media (min-width:600px)": {
+            borderRadius: 8,
+            margin: "4px 8px",
+            minHeight: 40,
+            fontSize: "1rem",
+          },
+        },
+      },
+    },
+    // Dialog component styling
+    MuiDialog: {
+      styleOverrides: {
+        paper: {
+          margin: "16px",
+          maxHeight: "calc(100% - 32px)",
+          "@media (min-width:600px)": {
+            margin: "32px",
+            maxHeight: "calc(100% - 64px)",
+          },
         },
       },
     },
@@ -195,7 +320,15 @@ function App() {
         />
 
         {/* Main Content */}
-        <Container maxWidth="lg" sx={{ py: { xs: 3, sm: 4 } }}>
+        <Container
+          maxWidth="lg"
+          sx={{
+            py: { xs: 2, sm: 3, md: 4 },
+            px: { xs: 2, sm: 3, md: 4 },
+            width: "100%",
+            maxWidth: { xs: "100%", sm: "100%", md: "lg" },
+          }}
+        >
           {activeTab === "work-hours-tracker" && (
             <WorkHoursTracker
               dayState={dayState}

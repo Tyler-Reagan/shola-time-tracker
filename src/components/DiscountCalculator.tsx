@@ -60,12 +60,22 @@ export const DiscountCalculator: React.FC = () => {
   const chipSum = priceChips.reduce((total, chipPrice) => total + chipPrice, 0);
 
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+    <Box
+      sx={{ display: "flex", flexDirection: "column", gap: { xs: 2, sm: 3 } }}
+    >
       <Card>
         <CardHeader
           sx={{ pb: 0 }}
           title={
-            <Typography variant="h4" component="h1" sx={{ fontWeight: "bold" }}>
+            <Typography
+              variant="h4"
+              component="h1"
+              sx={{
+                fontWeight: "bold",
+                fontSize: { xs: "1.5rem", sm: "2rem", md: "2.125rem" },
+                textAlign: { xs: "center", sm: "left" },
+              }}
+            >
               Discount Calculator
             </Typography>
           }
@@ -74,7 +84,11 @@ export const DiscountCalculator: React.FC = () => {
           <Typography
             variant="body1"
             component="p"
-            sx={{ fontSize: 14, mb: 1 }}
+            sx={{
+              fontSize: { xs: "0.875rem", sm: "0.875rem" },
+              mb: 1,
+              textAlign: { xs: "center", sm: "left" },
+            }}
           >
             Enter the original price of the item you want to calculate the
             discount for.
@@ -97,16 +111,21 @@ export const DiscountCalculator: React.FC = () => {
             <Box
               sx={{
                 display: "flex",
+                flexDirection: { xs: "column", sm: "row" },
                 gap: 2,
-                justifyContent: "flex-start",
-                alignItems: "flex-start",
+                justifyContent: { xs: "center", sm: "flex-start" },
+                alignItems: { xs: "stretch", sm: "flex-start" },
               }}
             >
               <Button
                 type="submit"
                 variant="contained"
                 color="primary"
-                sx={{ minWidth: 120 }}
+                sx={{
+                  minWidth: { xs: "100%", sm: 120 },
+                  minHeight: { xs: 44, sm: 36 },
+                  width: { xs: "100%", sm: "auto" },
+                }}
               >
                 Submit Price
               </Button>
@@ -116,7 +135,10 @@ export const DiscountCalculator: React.FC = () => {
                   variant="contained"
                   color="primary"
                   onClick={handleSubmitSum}
-                  sx={{ minWidth: 120 }}
+                  sx={{
+                    minWidth: { xs: "100%", sm: 120 },
+                    minHeight: { xs: 44, sm: 36 },
+                  }}
                 >
                   Submit Sum
                 </Button>
@@ -136,6 +158,7 @@ export const DiscountCalculator: React.FC = () => {
               alignItems="center"
               flexWrap="wrap"
               useFlexGap
+              sx={{ justifyContent: { xs: "center", sm: "flex-start" } }}
             >
               {priceChips.map((chipPrice, index) => (
                 <Chip
@@ -144,14 +167,24 @@ export const DiscountCalculator: React.FC = () => {
                   onDelete={() => removeChip(index)}
                   color="primary"
                   variant="outlined"
+                  sx={{
+                    fontSize: { xs: "0.75rem", sm: "0.875rem" },
+                    height: { xs: 32, sm: 28 },
+                  }}
                 />
               ))}
-              <Box sx={{ flexGrow: 1 }} />
+              <Box sx={{ flexGrow: 1, display: { xs: "none", sm: "block" } }} />
               <Chip
                 label={`Sum: $${chipSum.toFixed(2)}`}
                 color="secondary"
                 variant="filled"
-                sx={{ fontWeight: "bold" }}
+                sx={{
+                  fontWeight: "bold",
+                  fontSize: { xs: "0.75rem", sm: "0.875rem" },
+                  height: { xs: 32, sm: 28 },
+                  width: { xs: "100%", sm: "auto" },
+                  justifyContent: { xs: "center", sm: "flex-start" },
+                }}
               />
             </Stack>
           </CardContent>
@@ -163,19 +196,70 @@ export const DiscountCalculator: React.FC = () => {
         <Card>
           <CardHeader
             title={
-              <Typography variant="h6" component="h2">
+              <Typography
+                variant="h6"
+                component="h2"
+                sx={{
+                  fontSize: { xs: "1rem", sm: "1.25rem" },
+                  textAlign: { xs: "center", sm: "left" },
+                }}
+              >
                 Discount Table for ${price.toFixed(2)}
               </Typography>
             }
           />
           <CardContent sx={{ p: 0, "&:last-child": { pb: 0 } }}>
-            <TableContainer component={Paper} variant="outlined">
-              <Table>
+            <TableContainer
+              component={Paper}
+              variant="outlined"
+              sx={{
+                overflowX: "auto",
+                "&::-webkit-scrollbar": {
+                  height: 8,
+                },
+                "&::-webkit-scrollbar-track": {
+                  backgroundColor: "rgba(255,255,255,0.1)",
+                  borderRadius: 4,
+                },
+                "&::-webkit-scrollbar-thumb": {
+                  backgroundColor: "rgba(255,255,255,0.3)",
+                  borderRadius: 4,
+                  "&:hover": {
+                    backgroundColor: "rgba(255,255,255,0.5)",
+                  },
+                },
+              }}
+            >
+              <Table sx={{ minWidth: 300 }}>
                 <TableHead>
                   <TableRow>
-                    <TableCell>Discount %</TableCell>
-                    <TableCell>Price After Discount ($)</TableCell>
-                    <TableCell>Price with Tax ($)</TableCell>
+                    <TableCell
+                      sx={{
+                        fontSize: { xs: "0.75rem", sm: "0.875rem" },
+                        fontWeight: 600,
+                        minWidth: { xs: 80, sm: 100 },
+                      }}
+                    >
+                      Discount %
+                    </TableCell>
+                    <TableCell
+                      sx={{
+                        fontSize: { xs: "0.75rem", sm: "0.875rem" },
+                        fontWeight: 600,
+                        minWidth: { xs: 100, sm: 140 },
+                      }}
+                    >
+                      Price After Discount ($)
+                    </TableCell>
+                    <TableCell
+                      sx={{
+                        fontSize: { xs: "0.75rem", sm: "0.875rem" },
+                        fontWeight: 600,
+                        minWidth: { xs: 100, sm: 120 },
+                      }}
+                    >
+                      Price with Tax ($)
+                    </TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -184,11 +268,30 @@ export const DiscountCalculator: React.FC = () => {
                       calculateDiscountedPrice(price, discountPercent);
                     return (
                       <TableRow key={discountPercent} hover>
-                        <TableCell component="th" scope="row">
+                        <TableCell
+                          component="th"
+                          scope="row"
+                          sx={{
+                            fontSize: { xs: "0.75rem", sm: "0.875rem" },
+                            fontWeight: "medium",
+                          }}
+                        >
                           {discountPercent}%
                         </TableCell>
-                        <TableCell>${discountedPrice.toFixed(2)}</TableCell>
-                        <TableCell>${priceWithTax.toFixed(2)}</TableCell>
+                        <TableCell
+                          sx={{
+                            fontSize: { xs: "0.75rem", sm: "0.875rem" },
+                          }}
+                        >
+                          ${discountedPrice.toFixed(2)}
+                        </TableCell>
+                        <TableCell
+                          sx={{
+                            fontSize: { xs: "0.75rem", sm: "0.875rem" },
+                          }}
+                        >
+                          ${priceWithTax.toFixed(2)}
+                        </TableCell>
                       </TableRow>
                     );
                   })}
