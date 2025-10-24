@@ -2,6 +2,7 @@ export interface TimeEntry {
   id: string;
   timestamp: Date;
   type: "clock-in" | "clock-out";
+  reason?: string; // Optional reason for clock-out entries
 }
 
 export interface DayState {

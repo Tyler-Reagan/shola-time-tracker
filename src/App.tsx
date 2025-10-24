@@ -145,7 +145,7 @@ function App() {
     }));
   };
 
-  const handleToggleEntry = (entryId: string) => {
+  const handleToggleEntry = (entryId: string, reason?: string) => {
     setDayState((prev) => {
       const entryIndex = prev.entries.findIndex((e) => e.id === entryId);
       if (entryIndex === -1) return prev;
@@ -159,6 +159,7 @@ function App() {
         id: crypto.randomUUID(),
         timestamp: now,
         type: newType,
+        reason: newType === "clock-out" ? reason : undefined,
       };
 
       return {
@@ -170,7 +171,7 @@ function App() {
   };
 
   const tabs = [
-    { id: "work-hours-tracker", label: "Day Tracker" },
+    { id: "work-hours-tracker", label: "Work Hours Tracker" },
     { id: "discount-calculator", label: "Discount Calculator" },
   ];
 

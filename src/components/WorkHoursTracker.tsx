@@ -20,6 +20,8 @@ import {
   DialogContent,
   DialogContentText,
   DialogActions,
+  FormControlLabel,
+  Checkbox,
 } from "@mui/material";
 import { AccessTime, PlayArrow, Stop } from "@mui/icons-material";
 import { DayState } from "../types";
@@ -28,8 +30,14 @@ interface WorkHoursTrackerProps {
   dayState: DayState;
   onStartDay: (clearExisting?: boolean) => void;
   onEndDay: () => void;
-  onToggleEntry: (entryId: string) => void;
+  onToggleEntry: (entryId: string, reason?: string) => void;
 }
+
+const CLOCK_OUT_REASONS = [
+  { emoji: "🚗", label: "Commuting", value: "commuting" },
+  { emoji: "🍜", label: "Lunch", value: "lunch" },
+  { emoji: "📝", label: "Misc", value: "misc" },
+];
 
 export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
   dayState,
@@ -38,6 +46,11 @@ export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
   onToggleEntry,
 }) => {
   const [showConfirmDialog, setShowConfirmDialog] = React.useState(false);
+  const [showReasonDialog, setShowReasonDialog] = React.useState(false);
+  const [disableReasonDialog, setDisableReasonDialog] = React.useState(false);
+  const [pendingEntryId, setPendingEntryId] = React.useState<string | null>(
+    null
+  );
   const formatTime = (date: Date): string => {
     return date.toLocaleTimeString("en-US", {
       hour: "numeric",
@@ -74,6 +87,31 @@ export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
 
   const handleCancelStartNewDay = () => {
     setShowConfirmDialog(false);
+  };
+
+  const handleToggleEntryClick = (entryId: string) => {
+    const entry = dayState.entries.find((e) => e.id === entryId);
+    if (entry && entry.type === "clock-in" && !disableReasonDialog) {
+      // Show reason dialog for clock-out
+      setPendingEntryId(entryId);
+      setShowReasonDialog(true);
+    } else {
+      // Direct toggle without reason dialog
+      onToggleEntry(entryId);
+    }
+  };
+
+  const handleReasonSelect = (reason: string) => {
+    if (pendingEntryId) {
+      onToggleEntry(pendingEntryId, reason);
+    }
+    setShowReasonDialog(false);
+    setPendingEntryId(null);
+  };
+
+  const handleCancelReasonDialog = () => {
+    setShowReasonDialog(false);
+    setPendingEntryId(null);
   };
 
   const getTotalWorkTime = (): string => {
@@ -203,6 +241,7 @@ export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
                 <TableRow>
                   <TableCell>Time</TableCell>
                   <TableCell>Type</TableCell>
+                  <TableCell>Reason</TableCell>
                   <TableCell>Action</TableCell>
                 </TableRow>
               </TableHead>
@@ -238,6 +277,49 @@ export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
                         />
                       </TableCell>
                       <TableCell>
+                        {entry.type === "clock-out" && entry.reason ? (
+                          <Box
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 1,
+                            }}
+                          >
+                            <Typography variant="body2">
+                              {
+                                CLOCK_OUT_REASONS.find(
+                                  (r) => r.value === entry.reason
+                                )?.emoji
+                              }
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              {
+                                CLOCK_OUT_REASONS.find(
+                                  (r) => r.value === entry.reason
+                                )?.label
+                              }
+                            </Typography>
+                          </Box>
+                        ) : entry.type === "clock-out" ? (
+                          <Box
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 1,
+                            }}
+                          >
+                            <Typography variant="body2">🌙</Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              End of day
+                            </Typography>
+                          </Box>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary">
+                            -
+                          </Typography>
+                        )}
+                      </TableCell>
+                      <TableCell>
                         {showClockBackIn ? (
                           <Button
                             onClick={() => onStartDay(false)}
@@ -250,7 +332,7 @@ export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
                           </Button>
                         ) : (
                           <Button
-                            onClick={() => onToggleEntry(entry.id)}
+                            onClick={() => handleToggleEntryClick(entry.id)}
                             variant="outlined"
                             color={
                               entry.type === "clock-in" ? "error" : "success"
@@ -274,7 +356,7 @@ export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
       {/* Empty state */}
       {dayState.entries.length === 0 && (
         <Card>
-          <CardContent sx={{ textAlign: "center", py: 8 }}>
+          <CardContent sx={{ textAlign: "center" }}>
             <AccessTime sx={{ fontSize: 80, color: "text.secondary", mb: 3 }} />
             <Typography
               variant="h5"
@@ -323,6 +405,91 @@ export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Clock-out Reason Dialog */}
+      <Dialog
+        open={showReasonDialog}
+        onClose={handleCancelReasonDialog}
+        aria-labelledby="reason-dialog-title"
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle id="reason-dialog-title">
+          Why are you clocking out?
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ mb: 3 }}>
+            Please select a reason for clocking out:
+          </DialogContentText>
+          <Box
+            sx={{
+              display: "flex",
+              flexDirection: { xs: "column", sm: "row" },
+              gap: 2,
+              justifyContent: "center",
+            }}
+          >
+            {CLOCK_OUT_REASONS.map((reason) => (
+              <Button
+                key={reason.value}
+                fullWidth
+                variant="outlined"
+                onClick={() => handleReasonSelect(reason.value)}
+                sx={{
+                  height: 80,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 1,
+                  border: "2px solid",
+                  borderColor: "primary.main",
+                  "&:hover": {
+                    backgroundColor: "primary.light",
+                    borderColor: "primary.dark",
+                  },
+                }}
+              >
+                <Typography variant="h4">{reason.emoji}</Typography>
+                <Typography variant="body2" sx={{ fontWeight: "medium" }}>
+                  {reason.label}
+                </Typography>
+              </Button>
+            ))}
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCancelReasonDialog} color="primary">
+            Cancel
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Clock-out reason toggle */}
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "flex-start",
+          py: 0.5,
+          px: 2,
+          border: "1px solid",
+          borderColor: "divider",
+          borderRadius: 1,
+          backgroundColor: "background.paper",
+          maxWidth: "fit-content",
+        }}
+      >
+        <FormControlLabel
+          control={
+            <Checkbox
+              checked={disableReasonDialog}
+              onChange={(e) => setDisableReasonDialog(e.target.checked)}
+              color="primary"
+              size="small"
+            />
+          }
+          label="Disable clock-out reason dialog"
+          sx={{ m: 0 }}
+        />
+      </Box>
     </Box>
   );
 };
