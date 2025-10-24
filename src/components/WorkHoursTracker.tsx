@@ -35,7 +35,7 @@ interface WorkHoursTrackerProps {
 const CLOCK_OUT_REASONS = [
   { emoji: "🚗", label: "Commuting", value: "commuting" },
   { emoji: "🍜", label: "Lunch", value: "lunch" },
-  { emoji: "📝", label: "Misc", value: "misc" },
+  { emoji: "📝", label: "Miscellaneous", value: "misc" },
 ];
 
 export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
@@ -50,12 +50,28 @@ export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
   const [pendingEntryId, setPendingEntryId] = React.useState<string | null>(
     null
   );
+  // Shared time formatting utilities
   const formatTime = (date: Date): string => {
     return date.toLocaleTimeString("en-US", {
       hour: "numeric",
       minute: "2-digit",
       hour12: true,
     });
+  };
+
+  const formatDate = (date: Date): string => {
+    return date.toLocaleDateString("en-US", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+  };
+
+  const formatDuration = (minutes: number): string => {
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+    return `${hours}h ${remainingMinutes}m`;
   };
 
   const getDurationForEntry = (entry: any, index: number): string => {
@@ -70,21 +86,10 @@ export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
     if (nextEntry) {
       const diffMs = nextEntry.timestamp.getTime() - entry.timestamp.getTime();
       const minutes = Math.round(diffMs / (1000 * 60));
-      const hours = Math.floor(minutes / 60);
-      const remainingMinutes = minutes % 60;
-      return `${hours}h ${remainingMinutes}m`;
+      return formatDuration(minutes);
     }
 
     return "";
-  };
-
-  const formatDate = (date: Date): string => {
-    return date.toLocaleDateString("en-US", {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
   };
 
   const currentDate = dayState.dayDate
@@ -133,9 +138,10 @@ export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
     setPendingEntryId(null);
   };
 
-  const getTotalWorkTime = (): string => {
+  // Shared work time calculation logic
+  const calculateWorkTime = (): number => {
     if (!dayState.startTime || dayState.entries.length === 0) {
-      return "0h 0m";
+      return 0;
     }
 
     let totalMinutes = 0;
@@ -151,15 +157,12 @@ export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
       }
     }
 
-    // No live time calculation - only completed sessions count
-    const hours = Math.floor(totalMinutes / 60);
-    const minutes = totalMinutes % 60;
-    return `${hours}h ${minutes}m`;
+    return totalMinutes;
   };
 
-  const getTotalBreakTime = (): string => {
+  const calculateBreakTime = (): number => {
     if (!dayState.startTime || dayState.entries.length === 0) {
-      return "0h 0m";
+      return 0;
     }
 
     let totalBreakMinutes = 0;
@@ -175,9 +178,15 @@ export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
       }
     }
 
-    const hours = Math.floor(totalBreakMinutes / 60);
-    const minutes = totalBreakMinutes % 60;
-    return `${hours}h ${minutes}m`;
+    return totalBreakMinutes;
+  };
+
+  const getTotalWorkTime = (): string => {
+    return formatDuration(calculateWorkTime());
+  };
+
+  const getTotalBreakTime = (): string => {
+    return formatDuration(calculateBreakTime());
   };
 
   const getClockOutTime = (): string => {
@@ -187,24 +196,7 @@ export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
 
     const MAX_WORK_HOURS = 8;
     const MAX_WORK_MINUTES = MAX_WORK_HOURS * 60;
-
-    // Calculate total work time in minutes (excluding breaks) - only completed sessions
-    let totalWorkMinutes = 0;
-    let clockInTime: Date | null = null;
-
-    for (const entry of dayState.entries) {
-      if (entry.type === "clock-in") {
-        clockInTime = entry.timestamp;
-      } else if (entry.type === "clock-out" && clockInTime) {
-        const diffMs = entry.timestamp.getTime() - clockInTime.getTime();
-        totalWorkMinutes += Math.floor(diffMs / (1000 * 60));
-        clockInTime = null;
-      }
-    }
-
-    // No live time calculation - only completed sessions count
-
-    // Calculate remaining work time
+    const totalWorkMinutes = calculateWorkTime();
     const remainingMinutes = MAX_WORK_MINUTES - totalWorkMinutes;
 
     if (remainingMinutes <= 0) {
@@ -212,7 +204,6 @@ export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
     }
 
     // Calculate the time when they must clock out
-    // This should be current time + remaining work time
     const now = new Date();
     const clockOutTime = new Date(now.getTime() + remainingMinutes * 60 * 1000);
 
@@ -405,11 +396,10 @@ export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
           <CardContent sx={{ pt: 0 }}>
             <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
               {dayState.entries.map((entry, index) => {
-                const isMostRecent = index === dayState.entries.length - 1;
-                const isLastEntry = index === dayState.entries.length - 1;
+                const isLatestEntry = index === dayState.entries.length - 1;
                 const showClockBackIn =
                   !dayState.isActive &&
-                  isLastEntry &&
+                  isLatestEntry &&
                   entry.type === "clock-out";
                 const duration = getDurationForEntry(entry, index);
 
@@ -512,27 +502,25 @@ export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
                           </Typography>
                         )}
                         {/* Reason indicator for clock-out entries */}
-                        {entry.type === "clock-out" && entry.reason && (
-                          <Typography
-                            variant="caption"
-                            sx={{
-                              color: "text.secondary",
-                              fontSize: { xs: "0.7rem", sm: "0.75rem" },
-                              mt: 0.25,
-                            }}
-                          >
-                            {
-                              CLOCK_OUT_REASONS.find(
-                                (r) => r.value === entry.reason
-                              )?.emoji
-                            }{" "}
-                            {
-                              CLOCK_OUT_REASONS.find(
-                                (r) => r.value === entry.reason
-                              )?.label
-                            }
-                          </Typography>
-                        )}
+                        {entry.type === "clock-out" &&
+                          entry.reason &&
+                          (() => {
+                            const reason = CLOCK_OUT_REASONS.find(
+                              (r) => r.value === entry.reason
+                            );
+                            return reason ? (
+                              <Typography
+                                variant="caption"
+                                sx={{
+                                  color: "text.secondary",
+                                  fontSize: { xs: "0.7rem", sm: "0.75rem" },
+                                  mt: 0.25,
+                                }}
+                              >
+                                {reason.emoji} {reason.label}
+                              </Typography>
+                            ) : null;
+                          })()}
                         {entry.type === "clock-out" && !entry.reason && (
                           <Typography
                             variant="caption"
@@ -583,7 +571,7 @@ export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
                             entry.type === "clock-in" ? "error" : "success"
                           }
                           size="medium"
-                          disabled={!isMostRecent}
+                          disabled={!isLatestEntry}
                           sx={{
                             fontSize: { xs: "0.875rem", sm: "1rem" },
                             minHeight: { xs: 40, sm: 44 },
@@ -751,7 +739,7 @@ export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
                 sx={{
                   height: { xs: 70, sm: 80 },
                   display: "flex",
-                  flexDirection: "column",
+                  flexDirection: "row",
                   gap: 1,
                   border: "2px solid",
                   borderColor: "primary.main",
@@ -769,10 +757,10 @@ export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
                   {reason.emoji}
                 </Typography>
                 <Typography
-                  variant="body2"
+                  variant="h6"
                   sx={{
                     fontWeight: "medium",
-                    fontSize: { xs: "0.875rem", sm: "0.875rem" },
+                    fontSize: { xs: "1.25rem", sm: "1.5rem" },
                   }}
                 >
                   {reason.label}
