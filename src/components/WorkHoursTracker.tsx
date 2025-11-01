@@ -287,7 +287,7 @@ export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
   };
 
   const getClockOutTime = (): string => {
-    if (!dayState.startTime) {
+    if (!dayState.startTime || dayState.entries.length === 0) {
       return "N/A";
     }
 
@@ -297,18 +297,60 @@ export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
     const remainingMinutes = MAX_WORK_MINUTES - totalWorkMinutes;
 
     if (remainingMinutes <= 0) {
-      return "Should clock out now";
+      return "Completed";
     }
 
-    // Calculate the time when they must clock out
-    const now = new Date();
-    const clockOutTime = new Date(now.getTime() + remainingMinutes * 60 * 1000);
+    // Find the last active clock-in (most recent clock-in without a clock-out after it)
+    let activeClockInTime: Date | null = null;
 
-    return clockOutTime.toLocaleTimeString("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-    });
+    for (let i = dayState.entries.length - 1; i >= 0; i--) {
+      if (dayState.entries[i].type === "clock-in") {
+        // Check if there's a clock-out after this clock-in
+        const hasLaterClockOut = dayState.entries
+          .slice(i + 1)
+          .some((e) => e.type === "clock-out");
+
+        if (!hasLaterClockOut) {
+          activeClockInTime = dayState.entries[i].timestamp;
+          break;
+        }
+      }
+    }
+
+    if (activeClockInTime) {
+      // They're actively working - calculate when they must clock out
+      const clockOutTime = new Date(
+        activeClockInTime.getTime() + remainingMinutes * 60 * 1000
+      );
+
+      const now = new Date();
+      if (clockOutTime.getTime() <= now.getTime()) {
+        return "Should clock out now";
+      }
+
+      return clockOutTime.toLocaleTimeString("en-US", {
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+      });
+    } else {
+      // They're clocked out (on break) - calculate when they need to finish their 8 hours
+      // This is the day start time + 8 hours
+      const finishTime = new Date(
+        dayState.startTime.getTime() + MAX_WORK_MINUTES * 60 * 1000
+      );
+
+      const now = new Date();
+      if (finishTime.getTime() <= now.getTime()) {
+        return "Should finish now";
+      }
+
+      return finishTime.toLocaleTimeString("en-US", {
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+      });
+    }
   };
 
   return (
