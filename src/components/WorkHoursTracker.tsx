@@ -15,6 +15,12 @@ import {
   DialogActions,
   FormControlLabel,
   Checkbox,
+  TextField,
+  IconButton,
+  Menu,
+  MenuItem,
+  ListItemIcon,
+  ListItemText,
 } from "@mui/material";
 import {
   AccessTime,
@@ -22,6 +28,9 @@ import {
   Stop,
   Coffee,
   Schedule,
+  Edit,
+  MoreVert,
+  Delete,
 } from "@mui/icons-material";
 import { DayState } from "../types";
 
@@ -30,6 +39,8 @@ interface WorkHoursTrackerProps {
   onStartDay: (clearExisting?: boolean) => void;
   onEndDay: () => void;
   onToggleEntry: (entryId: string, reason?: string) => void;
+  onUpdateEntry: (entryId: string, newTimestamp: Date) => void;
+  onDeleteEntry: (entryId: string) => void;
 }
 
 const CLOCK_OUT_REASONS = [
@@ -43,11 +54,26 @@ export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
   onStartDay,
   onEndDay,
   onToggleEntry,
+  onUpdateEntry,
+  onDeleteEntry,
 }) => {
   const [showConfirmDialog, setShowConfirmDialog] = React.useState(false);
   const [showReasonDialog, setShowReasonDialog] = React.useState(false);
   const [disableReasonDialog, setDisableReasonDialog] = React.useState(false);
   const [pendingEntryId, setPendingEntryId] = React.useState<string | null>(
+    null
+  );
+  const [showEditDialog, setShowEditDialog] = React.useState(false);
+  const [editingEntryId, setEditingEntryId] = React.useState<string | null>(
+    null
+  );
+  const [editDateTime, setEditDateTime] = React.useState<string>("");
+  const [menuAnchor, setMenuAnchor] = React.useState<{
+    element: HTMLElement;
+    entryId: string;
+  } | null>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = React.useState(false);
+  const [deletingEntryId, setDeletingEntryId] = React.useState<string | null>(
     null
   );
   // Shared time formatting utilities
@@ -136,6 +162,77 @@ export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
   const handleCancelReasonDialog = () => {
     setShowReasonDialog(false);
     setPendingEntryId(null);
+  };
+
+  const handleEditEntryClick = (entryId: string) => {
+    const entry = dayState.entries.find((e) => e.id === entryId);
+    if (entry) {
+      setEditingEntryId(entryId);
+      // Format date for datetime-local input (YYYY-MM-DDTHH:mm)
+      const date = entry.timestamp;
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const day = String(date.getDate()).padStart(2, "0");
+      const hours = String(date.getHours()).padStart(2, "0");
+      const minutes = String(date.getMinutes()).padStart(2, "0");
+      setEditDateTime(`${year}-${month}-${day}T${hours}:${minutes}`);
+      setShowEditDialog(true);
+    }
+  };
+
+  const handleSaveEdit = () => {
+    if (editingEntryId && editDateTime) {
+      const newTimestamp = new Date(editDateTime);
+      onUpdateEntry(editingEntryId, newTimestamp);
+      setShowEditDialog(false);
+      setEditingEntryId(null);
+      setEditDateTime("");
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setShowEditDialog(false);
+    setEditingEntryId(null);
+    setEditDateTime("");
+  };
+
+  const handleMenuOpen = (
+    event: React.MouseEvent<HTMLElement>,
+    entryId: string
+  ) => {
+    setMenuAnchor({ element: event.currentTarget, entryId });
+  };
+
+  const handleMenuClose = () => {
+    setMenuAnchor(null);
+  };
+
+  const handleMenuEdit = () => {
+    if (menuAnchor) {
+      handleEditEntryClick(menuAnchor.entryId);
+      handleMenuClose();
+    }
+  };
+
+  const handleMenuDelete = () => {
+    if (menuAnchor) {
+      setDeletingEntryId(menuAnchor.entryId);
+      setShowDeleteDialog(true);
+      handleMenuClose();
+    }
+  };
+
+  const handleConfirmDelete = () => {
+    if (deletingEntryId) {
+      onDeleteEntry(deletingEntryId);
+      setShowDeleteDialog(false);
+      setDeletingEntryId(null);
+    }
+  };
+
+  const handleCancelDelete = () => {
+    setShowDeleteDialog(false);
+    setDeletingEntryId(null);
   };
 
   // Shared work time calculation logic
@@ -409,179 +506,208 @@ export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
                     sx={{
                       display: "flex",
                       alignItems: "center",
-                      justifyContent: "space-between",
-                      py: { xs: 1, sm: 1.25 }, // Reduced vertical padding
-                      px: { xs: 1.5, sm: 2 }, // Keep horizontal padding
-                      border: "1px solid",
-                      borderColor: "divider",
-                      borderRadius: 2,
-                      backgroundColor: "background.paper",
-                      minHeight: 48, // Reduced from 60 to 48
-                      "&:hover": {
-                        backgroundColor: "action.hover",
-                      },
+                      gap: 1,
                     }}
                   >
-                    {/* Left side - Time, Badge, and Reason */}
-                    <Box sx={{ flex: 0, minWidth: 120 }}>
-                      <Box
-                        sx={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 1,
-                          minHeight: 32,
-                        }}
-                      >
-                        <Typography
-                          variant="h6"
-                          sx={{
-                            fontWeight: "bold",
-                            fontSize: { xs: "1rem", sm: "1.25rem" },
-                            color:
-                              entry.type === "clock-in"
-                                ? "success.main"
-                                : "error.main",
-                            lineHeight: 1,
-                            display: "flex",
-                            alignItems: "center",
-                          }}
-                        >
-                          {formatTime(entry.timestamp)}
-                        </Typography>
-                        <Chip
-                          label={entry.type === "clock-in" ? "IN" : "OUT"}
-                          color={
-                            entry.type === "clock-in" ? "success" : "error"
-                          }
-                          variant="filled"
-                          size="small"
-                          sx={{
-                            fontSize: { xs: "0.7rem", sm: "0.75rem" },
-                            fontWeight: "bold",
-                            height: { xs: 24, sm: 28 },
-                            minWidth: 40, // Equal width for both IN and OUT
-                            justifyContent: "center",
-                            alignSelf: "center",
-                            transform: "translateY(-1px)", // Fine-tune to match timestamp visual center
-                          }}
-                        />
-                      </Box>
-                    </Box>
+                    {/* Menu button - outside the row */}
+                    <IconButton
+                      onClick={(e) => handleMenuOpen(e, entry.id)}
+                      size="small"
+                      sx={{
+                        color: "text.secondary",
+                        "&:hover": {
+                          color: "primary.main",
+                          backgroundColor: "action.hover",
+                        },
+                        flexShrink: 0,
+                      }}
+                      aria-label="Entry options"
+                    >
+                      <MoreVert />
+                    </IconButton>
 
-                    {/* Center - Duration and Reason */}
+                    {/* Row content */}
                     <Box
                       sx={{
                         display: "flex",
-                        flexDirection: "column",
                         alignItems: "center",
-                        justifyContent: "center",
-                        flex: 1, // Take up remaining space to center better
-                        maxWidth: 120, // Prevent it from getting too wide
-                        mx: { xs: 1, sm: 1.5 },
-                        minHeight: 48, // Match reduced row height
+                        justifyContent: "space-between",
+                        flex: 1,
+                        py: { xs: 1, sm: 1.25 },
+                        px: { xs: 1.5, sm: 2 },
+                        border: "1px solid",
+                        borderColor: "divider",
+                        borderRadius: 2,
+                        backgroundColor: "background.paper",
+                        minHeight: 48,
+                        "&:hover": {
+                          backgroundColor: "action.hover",
+                        },
                       }}
                     >
+                      {/* Left side - Time and Badge */}
+                      <Box sx={{ flex: 0, minWidth: 120 }}>
+                        <Box
+                          sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 1,
+                            minHeight: 32,
+                          }}
+                        >
+                          <Typography
+                            variant="h6"
+                            sx={{
+                              fontWeight: "bold",
+                              fontSize: { xs: "1rem", sm: "1.25rem" },
+                              color:
+                                entry.type === "clock-in"
+                                  ? "success.main"
+                                  : "error.main",
+                              lineHeight: 1,
+                              display: "flex",
+                              alignItems: "center",
+                            }}
+                          >
+                            {formatTime(entry.timestamp)}
+                          </Typography>
+                          <Chip
+                            label={entry.type === "clock-in" ? "IN" : "OUT"}
+                            color={
+                              entry.type === "clock-in" ? "success" : "error"
+                            }
+                            variant="filled"
+                            size="small"
+                            sx={{
+                              fontSize: { xs: "0.7rem", sm: "0.75rem" },
+                              fontWeight: "bold",
+                              height: { xs: 24, sm: 28 },
+                              minWidth: 40,
+                              justifyContent: "center",
+                              alignSelf: "center",
+                              transform: "translateY(-1px)",
+                            }}
+                          />
+                        </Box>
+                      </Box>
+
+                      {/* Center - Duration and Reason */}
                       <Box
                         sx={{
                           display: "flex",
                           flexDirection: "column",
                           alignItems: "center",
-                          textAlign: "center",
+                          justifyContent: "center",
+                          flex: 1, // Take up remaining space to center better
+                          maxWidth: 120, // Prevent it from getting too wide
+                          mx: { xs: 1, sm: 1.5 },
+                          minHeight: 48, // Match reduced row height
                         }}
                       >
-                        {duration && (
-                          <Typography
-                            variant="body2"
+                        <Box
+                          sx={{
+                            display: "flex",
+                            flexDirection: "column",
+                            alignItems: "center",
+                            textAlign: "center",
+                          }}
+                        >
+                          {duration && (
+                            <Typography
+                              variant="body2"
+                              sx={{
+                                color: "text.secondary",
+                                fontSize: { xs: "0.875rem", sm: "1rem" },
+                                fontWeight: "medium",
+                              }}
+                            >
+                              {duration}
+                            </Typography>
+                          )}
+                          {/* Reason indicator for clock-out entries */}
+                          {entry.type === "clock-out" &&
+                            entry.reason &&
+                            (() => {
+                              const reason = CLOCK_OUT_REASONS.find(
+                                (r) => r.value === entry.reason
+                              );
+                              return reason ? (
+                                <Typography
+                                  variant="caption"
+                                  sx={{
+                                    color: "text.secondary",
+                                    fontSize: { xs: "0.7rem", sm: "0.75rem" },
+                                    mt: 0.25,
+                                  }}
+                                >
+                                  {reason.emoji} {reason.label}
+                                </Typography>
+                              ) : null;
+                            })()}
+                          {entry.type === "clock-out" && !entry.reason && (
+                            <Typography
+                              variant="caption"
+                              sx={{
+                                color: "text.secondary",
+                                fontSize: { xs: "0.7rem", sm: "0.75rem" },
+                                mt: 0.25,
+                              }}
+                            >
+                              🌙 End of day
+                            </Typography>
+                          )}
+                        </Box>
+                      </Box>
+
+                      {/* Right side - Action button */}
+                      <Box
+                        sx={{
+                          display: "flex",
+                          justifyContent: "flex-end",
+                          alignItems: "center",
+                          flex: 0,
+                          minWidth: 100, // Fixed width for consistent positioning
+                          minHeight: 48, // Match reduced row height
+                        }}
+                      >
+                        {showClockBackIn ? (
+                          <Button
+                            onClick={() => onStartDay(false)}
+                            variant="contained"
+                            color="success"
+                            startIcon={<PlayArrow />}
+                            size="medium"
                             sx={{
-                              color: "text.secondary",
                               fontSize: { xs: "0.875rem", sm: "1rem" },
-                              fontWeight: "medium",
+                              minHeight: { xs: 40, sm: 44 },
+                              minWidth: 100, // Uniform width for all buttons
+                              px: { xs: 2, sm: 3 },
                             }}
                           >
-                            {duration}
-                          </Typography>
-                        )}
-                        {/* Reason indicator for clock-out entries */}
-                        {entry.type === "clock-out" &&
-                          entry.reason &&
-                          (() => {
-                            const reason = CLOCK_OUT_REASONS.find(
-                              (r) => r.value === entry.reason
-                            );
-                            return reason ? (
-                              <Typography
-                                variant="caption"
-                                sx={{
-                                  color: "text.secondary",
-                                  fontSize: { xs: "0.7rem", sm: "0.75rem" },
-                                  mt: 0.25,
-                                }}
-                              >
-                                {reason.emoji} {reason.label}
-                              </Typography>
-                            ) : null;
-                          })()}
-                        {entry.type === "clock-out" && !entry.reason && (
-                          <Typography
-                            variant="caption"
+                            Back In
+                          </Button>
+                        ) : (
+                          <Button
+                            onClick={() => handleToggleEntryClick(entry.id)}
+                            variant="outlined"
+                            color={
+                              entry.type === "clock-in" ? "error" : "success"
+                            }
+                            size="medium"
+                            disabled={!isLatestEntry}
                             sx={{
-                              color: "text.secondary",
-                              fontSize: { xs: "0.7rem", sm: "0.75rem" },
-                              mt: 0.25,
+                              fontSize: { xs: "0.875rem", sm: "1rem" },
+                              minHeight: { xs: 40, sm: 44 },
+                              minWidth: 100, // Uniform width for all buttons
+                              px: { xs: 2, sm: 3 },
                             }}
                           >
-                            🌙 End of day
-                          </Typography>
+                            {entry.type === "clock-in"
+                              ? "Clock Out"
+                              : "Clock In"}
+                          </Button>
                         )}
                       </Box>
-                    </Box>
-
-                    {/* Right side - Action button */}
-                    <Box
-                      sx={{
-                        display: "flex",
-                        justifyContent: "flex-end",
-                        alignItems: "center",
-                        flex: 0,
-                        minWidth: 100, // Fixed width for consistent positioning
-                        minHeight: 48, // Match reduced row height
-                      }}
-                    >
-                      {showClockBackIn ? (
-                        <Button
-                          onClick={() => onStartDay(false)}
-                          variant="contained"
-                          color="success"
-                          startIcon={<PlayArrow />}
-                          size="medium"
-                          sx={{
-                            fontSize: { xs: "0.875rem", sm: "1rem" },
-                            minHeight: { xs: 40, sm: 44 },
-                            minWidth: 100, // Uniform width for all buttons
-                            px: { xs: 2, sm: 3 },
-                          }}
-                        >
-                          Back In
-                        </Button>
-                      ) : (
-                        <Button
-                          onClick={() => handleToggleEntryClick(entry.id)}
-                          variant="outlined"
-                          color={
-                            entry.type === "clock-in" ? "error" : "success"
-                          }
-                          size="medium"
-                          disabled={!isLatestEntry}
-                          sx={{
-                            fontSize: { xs: "0.875rem", sm: "1rem" },
-                            minHeight: { xs: 40, sm: 44 },
-                            minWidth: 100, // Uniform width for all buttons
-                            px: { xs: 2, sm: 3 },
-                          }}
-                        >
-                          {entry.type === "clock-in" ? "Clock Out" : "Clock In"}
-                        </Button>
-                      )}
                     </Box>
                   </Box>
                 );
@@ -590,6 +716,34 @@ export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
           </CardContent>
         </Card>
       )}
+
+      {/* Entry Menu */}
+      <Menu
+        anchorEl={menuAnchor?.element || null}
+        open={Boolean(menuAnchor)}
+        onClose={handleMenuClose}
+        anchorOrigin={{
+          vertical: "bottom",
+          horizontal: "right",
+        }}
+        transformOrigin={{
+          vertical: "top",
+          horizontal: "right",
+        }}
+      >
+        <MenuItem onClick={handleMenuEdit}>
+          <ListItemIcon>
+            <Edit fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Edit</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={handleMenuDelete}>
+          <ListItemIcon>
+            <Delete fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Delete</ListItemText>
+        </MenuItem>
+      </Menu>
 
       {/* Empty state */}
       {dayState.entries.length === 0 && (
@@ -832,6 +986,154 @@ export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
           sx={{ m: 0 }}
         />
       </Box>
+
+      {/* Edit Entry Dialog */}
+      <Dialog
+        open={showEditDialog}
+        onClose={handleCancelEdit}
+        aria-labelledby="edit-dialog-title"
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle
+          id="edit-dialog-title"
+          sx={{
+            fontSize: { xs: "1.125rem", sm: "1.25rem" },
+            textAlign: { xs: "center", sm: "left" },
+          }}
+        >
+          Edit Time Entry
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText
+            sx={{
+              mb: 3,
+              fontSize: { xs: "0.875rem", sm: "1rem" },
+              textAlign: { xs: "center", sm: "left" },
+            }}
+          >
+            Update the date and time for this entry:
+          </DialogContentText>
+          <TextField
+            autoFocus
+            margin="dense"
+            id="datetime"
+            label="Date & Time"
+            type="datetime-local"
+            fullWidth
+            variant="outlined"
+            value={editDateTime}
+            onChange={(e) => setEditDateTime(e.target.value)}
+            InputLabelProps={{
+              shrink: true,
+            }}
+            sx={{
+              "& .MuiOutlinedInput-root": {
+                fontSize: { xs: "1rem", sm: "1rem" },
+              },
+            }}
+          />
+        </DialogContent>
+        <DialogActions
+          sx={{
+            flexDirection: { xs: "column", sm: "row" },
+            gap: { xs: 1, sm: 0 },
+            px: { xs: 2, sm: 3 },
+            pb: { xs: 2, sm: 3 },
+          }}
+        >
+          <Button
+            onClick={handleCancelEdit}
+            color="primary"
+            fullWidth
+            sx={{
+              minHeight: { xs: 44, sm: 36 },
+              width: { xs: "100%", sm: "auto" },
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSaveEdit}
+            color="primary"
+            variant="contained"
+            autoFocus
+            fullWidth
+            disabled={!editDateTime}
+            sx={{
+              minHeight: { xs: 44, sm: 36 },
+              width: { xs: "100%", sm: "auto" },
+            }}
+          >
+            Save
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={showDeleteDialog}
+        onClose={handleCancelDelete}
+        aria-labelledby="delete-dialog-title"
+        aria-describedby="delete-dialog-description"
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle
+          id="delete-dialog-title"
+          sx={{
+            fontSize: { xs: "1.125rem", sm: "1.25rem" },
+            textAlign: { xs: "center", sm: "left" },
+          }}
+        >
+          Delete Time Entry?
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText
+            id="delete-dialog-description"
+            sx={{
+              fontSize: { xs: "0.875rem", sm: "1rem" },
+              textAlign: { xs: "center", sm: "left" },
+            }}
+          >
+            Are you sure you want to delete this time entry? This action cannot
+            be undone and will affect your work hours calculations.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions
+          sx={{
+            flexDirection: { xs: "column", sm: "row" },
+            gap: { xs: 1, sm: 0 },
+            px: { xs: 2, sm: 3 },
+            pb: { xs: 2, sm: 3 },
+          }}
+        >
+          <Button
+            onClick={handleCancelDelete}
+            color="primary"
+            fullWidth
+            sx={{
+              minHeight: { xs: 44, sm: 36 },
+              width: { xs: "100%", sm: "auto" },
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleConfirmDelete}
+            color="error"
+            variant="contained"
+            autoFocus
+            fullWidth
+            sx={{
+              minHeight: { xs: 44, sm: 36 },
+              width: { xs: "100%", sm: "auto" },
+            }}
+          >
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

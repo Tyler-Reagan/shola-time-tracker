@@ -295,6 +295,63 @@ function App() {
     });
   };
 
+  const handleUpdateEntry = (entryId: string, newTimestamp: Date) => {
+    setDayState((prev) => {
+      const entryIndex = prev.entries.findIndex((e) => e.id === entryId);
+      if (entryIndex === -1) return prev;
+
+      const updatedEntries = [...prev.entries];
+      updatedEntries[entryIndex] = {
+        ...updatedEntries[entryIndex],
+        timestamp: newTimestamp,
+      };
+
+      // Sort entries by timestamp to maintain chronological order
+      updatedEntries.sort(
+        (a, b) => a.timestamp.getTime() - b.timestamp.getTime()
+      );
+
+      // Update startTime if the first entry (after sorting) is a clock-in
+      let updatedStartTime = prev.startTime;
+      if (updatedEntries.length > 0 && updatedEntries[0].type === "clock-in") {
+        updatedStartTime = updatedEntries[0].timestamp;
+      }
+
+      return {
+        ...prev,
+        entries: updatedEntries,
+        startTime: updatedStartTime,
+      };
+    });
+  };
+
+  const handleDeleteEntry = (entryId: string) => {
+    setDayState((prev) => {
+      const entryIndex = prev.entries.findIndex((e) => e.id === entryId);
+      if (entryIndex === -1) return prev;
+
+      const filteredEntries = prev.entries.filter((e) => e.id !== entryId);
+
+      // Update startTime if we deleted the first entry and there's still a clock-in entry
+      let updatedStartTime = prev.startTime;
+      if (filteredEntries.length > 0 && filteredEntries[0].type === "clock-in") {
+        updatedStartTime = filteredEntries[0].timestamp;
+      } else if (filteredEntries.length === 0) {
+        updatedStartTime = undefined;
+      }
+
+      // If no entries remain, deactivate the day
+      const isActive = filteredEntries.length > 0 ? prev.isActive : false;
+
+      return {
+        ...prev,
+        entries: filteredEntries,
+        startTime: updatedStartTime,
+        isActive,
+      };
+    });
+  };
+
   const tabs = [
     { id: "work-hours-tracker", label: "Work Hours Tracker" },
     { id: "discount-calculator", label: "Discount Calculator" },
@@ -335,6 +392,8 @@ function App() {
               onStartDay={handleStartDay}
               onEndDay={handleEndDay}
               onToggleEntry={handleToggleEntry}
+              onUpdateEntry={handleUpdateEntry}
+              onDeleteEntry={handleDeleteEntry}
             />
           )}
           {activeTab === "discount-calculator" && <DiscountCalculator />}
