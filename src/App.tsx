@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Container,
   Box,
@@ -10,6 +10,7 @@ import { WorkHoursTracker } from "./components/WorkHoursTracker";
 import { DiscountCalculator } from "../src/components/DiscountCalculator";
 import { CustomTabs } from "../src/components/Tabs";
 import { TimeEntry, DayState } from "./types";
+import { loadDayState, saveDayState, isStorageAvailable } from "./utils/storage";
 
 // Create a dark theme for the app
 const darkTheme = createTheme({
@@ -233,10 +234,27 @@ function App() {
   const [activeTab, setActiveTab] = useState<
     "work-hours-tracker" | "discount-calculator"
   >("work-hours-tracker");
-  const [dayState, setDayState] = useState<DayState>({
-    isActive: false,
-    entries: [],
+  
+  // Initialize dayState from localStorage if available
+  const [dayState, setDayState] = useState<DayState>(() => {
+    if (isStorageAvailable()) {
+      const savedState = loadDayState();
+      if (savedState) {
+        return savedState;
+      }
+    }
+    return {
+      isActive: false,
+      entries: [],
+    };
   });
+
+  // Save dayState to localStorage whenever it changes
+  useEffect(() => {
+    if (isStorageAvailable()) {
+      saveDayState(dayState);
+    }
+  }, [dayState]);
 
   const handleStartDay = (clearExisting = false) => {
     const now = new Date();
