@@ -31,7 +31,7 @@ import {
   Delete,
 } from "@mui/icons-material";
 import { DayState } from "../types";
-import { getCurrentTime } from "../utils/timeSimulator";
+import { getCurrentTime, isSimulationActive } from "../utils/timeSimulator";
 
 interface WorkHoursTrackerProps {
   dayState: DayState;
@@ -71,6 +71,40 @@ export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
     periodStart: Date;
     periodEnd: Date;
   } | null>(null);
+  // Real-time ticker for live updates (triggers re-renders to update time-based calculations)
+  const [, setTick] = React.useState<number>(0);
+
+  // Check if there's an active clock-in
+  const hasActiveClockIn = React.useMemo(() => {
+    if (dayState.entries.length === 0) return false;
+    const lastEntry = dayState.entries[dayState.entries.length - 1];
+    return lastEntry.type === "clock-in";
+  }, [dayState.entries]);
+
+  // Update ticker to refresh live calculations
+  // Update more frequently when simulator is active or when there's an active clock-in
+  React.useEffect(() => {
+    const isSimulatorActive = isSimulationActive();
+    let intervalMs: number;
+
+    if (isSimulatorActive) {
+      // When simulator is active, update every 5 seconds for responsiveness
+      intervalMs = 5000;
+    } else if (hasActiveClockIn) {
+      // When actively clocked in, update every 15 seconds
+      intervalMs = 15000;
+    } else {
+      // Otherwise, update every minute
+      intervalMs = 60000;
+    }
+
+    const interval = setInterval(() => {
+      setTick((prev) => prev + 1);
+    }, intervalMs);
+
+    return () => clearInterval(interval);
+  }, [hasActiveClockIn]);
+
   // Shared time formatting utilities
   const formatTime = (date: Date): string => {
     return date.toLocaleTimeString("en-US", {
@@ -229,11 +263,109 @@ export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
     );
   };
 
+  /**
+   * Checks if an entry crosses the 12pm tracking period boundary
+   * Returns the boundary date if crossed, null otherwise
+   * The boundary is shown BEFORE the entry that crosses it
+   */
+  const getTrackingPeriodBoundary = (
+    entry: Date,
+    nextEntry?: Date
+  ): Date | null => {
+    if (!nextEntry) {
+      return null; // Can't determine boundary without next entry
+    }
+
+    const entryHour = entry.getHours();
+    const entryDate = entry.getDate();
+    const nextHour = nextEntry.getHours();
+    const nextDate = nextEntry.getDate();
+    const daysDiff = nextDate - entryDate;
+
+    // Case 1: Entry before 12pm, next entry after 12pm on same day
+    if (
+      entryHour < TRACKING_PERIOD_START_HOUR &&
+      nextHour >= TRACKING_PERIOD_START_HOUR &&
+      daysDiff === 0
+    ) {
+      const boundary = new Date(entry);
+      boundary.setHours(TRACKING_PERIOD_START_HOUR, 0, 0, 0);
+      return boundary;
+    }
+
+    // Case 2: Entry after 12pm, next entry before 12pm next day (crosses midnight boundary)
+    if (
+      entryHour >= TRACKING_PERIOD_START_HOUR &&
+      nextHour < TRACKING_PERIOD_START_HOUR &&
+      daysDiff === 1
+    ) {
+      const boundary = new Date(nextEntry);
+      boundary.setHours(TRACKING_PERIOD_START_HOUR, 0, 0, 0);
+      boundary.setDate(boundary.getDate() - 1);
+      return boundary;
+    }
+
+    // Case 3: Entry before 12pm, next entry after 12pm next day (spans full day)
+    if (entryHour < TRACKING_PERIOD_START_HOUR && daysDiff > 0) {
+      // Check if there's a 12pm boundary in between
+      const boundary = new Date(entry);
+      boundary.setHours(TRACKING_PERIOD_START_HOUR, 0, 0, 0);
+      if (boundary.getTime() < nextEntry.getTime()) {
+        return boundary;
+      }
+    }
+
+    return null;
+  };
+
+  /**
+   * Calculates hours worked in a tracking period up to a boundary
+   * Handles entries that span the boundary (e.g., clock-in before 12pm, clock-out after 12pm)
+   */
+  const calculateHoursUpToBoundary = (
+    entries: typeof dayState.entries,
+    boundaryDate: Date
+  ): number => {
+    let totalMinutes = 0;
+    let clockInTime: Date | null = null;
+
+    for (const entry of entries) {
+      if (entry.type === "clock-in") {
+        clockInTime = entry.timestamp;
+      } else if (entry.type === "clock-out" && clockInTime) {
+        // If clock-in is before boundary and clock-out is after boundary,
+        // count only the time from clock-in to boundary
+        if (clockInTime < boundaryDate && entry.timestamp > boundaryDate) {
+          const diffMs = boundaryDate.getTime() - clockInTime.getTime();
+          totalMinutes += Math.floor(diffMs / (1000 * 60));
+        } else if (entry.timestamp <= boundaryDate) {
+          // Both are before or at boundary, count full duration
+          const diffMs = entry.timestamp.getTime() - clockInTime.getTime();
+          totalMinutes += Math.floor(diffMs / (1000 * 60));
+        }
+        // If both are after boundary, don't count (already in new period)
+        clockInTime = null;
+      }
+    }
+
+    // If there's an active clock-in that extends to boundary, count it
+    if (clockInTime && clockInTime < boundaryDate) {
+      const diffMs = boundaryDate.getTime() - clockInTime.getTime();
+      totalMinutes += Math.floor(diffMs / (1000 * 60));
+    }
+
+    return totalMinutes;
+  };
+
   const getDurationForEntry = (entry: any, index: number): string => {
-    // Latest row never has duration - its session hasn't ended yet
     const isLatestRow = index === dayState.entries.length - 1;
-    if (isLatestRow) {
-      return "";
+
+    // For the latest row, if it's a clock-in, show live duration
+    if (isLatestRow && entry.type === "clock-in") {
+      const now = getCurrentTime();
+      const diffMs = now.getTime() - entry.timestamp.getTime();
+      const minutes = Math.round(diffMs / (1000 * 60));
+      return formatDuration(minutes);
     }
 
     // For all other rows, calculate duration to the next row
@@ -395,6 +527,7 @@ export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
 
     let totalBreakMinutes = 0;
     let clockOutTime: Date | null = null;
+    const now = getCurrentTime();
 
     for (const entry of dayState.entries) {
       if (entry.type === "clock-out") {
@@ -404,6 +537,12 @@ export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
         totalBreakMinutes += Math.floor(diffMs / (1000 * 60));
         clockOutTime = null;
       }
+    }
+
+    // If the last entry is a clock-out, add the current break time
+    if (clockOutTime) {
+      const diffMs = now.getTime() - clockOutTime.getTime();
+      totalBreakMinutes += Math.floor(diffMs / (1000 * 60));
     }
 
     return totalBreakMinutes;
@@ -893,109 +1032,214 @@ export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
                   isLatestEntry &&
                   entry.type === "clock-out";
                 const duration = getDurationForEntry(entry, index);
+                const nextEntry = dayState.entries[index + 1];
+                // Check if the current entry and next entry cross a boundary
+                const boundary = nextEntry
+                  ? getTrackingPeriodBoundary(
+                      entry.timestamp,
+                      nextEntry.timestamp
+                    )
+                  : null;
+                // Calculate hours worked up to the boundary (including partial time from current entry if it spans boundary)
+                const hoursBeforeBoundary = boundary
+                  ? calculateHoursUpToBoundary(
+                      dayState.entries.slice(0, index + 1),
+                      boundary
+                    )
+                  : 0;
 
                 return (
-                  <Box
-                    key={entry.id}
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 1,
-                    }}
-                  >
-                    {/* Menu button - outside the row */}
-                    <IconButton
-                      onClick={(e) => handleMenuOpen(e, entry.id)}
-                      size="small"
-                      sx={{
-                        color: "text.secondary",
-                        "&:hover": {
-                          color: "primary.main",
-                          backgroundColor: "action.hover",
-                        },
-                        flexShrink: 0,
-                      }}
-                      aria-label="Entry options"
-                    >
-                      <MoreVert />
-                    </IconButton>
-
-                    {/* Row content */}
+                  <React.Fragment key={entry.id}>
+                    {/* Entry Row */}
                     <Box
                       sx={{
                         display: "flex",
                         alignItems: "center",
-                        justifyContent: "space-between",
-                        flex: 1,
-                        py: { xs: 1, sm: 1.25 },
-                        px: { xs: 1.5, sm: 2 },
-                        border: "1px solid",
-                        borderColor: "divider",
-                        borderRadius: 2,
-                        backgroundColor: "background.paper",
-                        minHeight: 48,
-                        "&:hover": {
-                          backgroundColor: "action.hover",
-                        },
+                        gap: 1,
                       }}
                     >
-                      {/* Left side - Time and Badge */}
-                      <Box sx={{ flex: 0, minWidth: 120 }}>
-                        <Box
-                          sx={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 1,
-                            minHeight: 32,
-                          }}
-                        >
-                          <Typography
-                            variant="h6"
-                            sx={{
-                              fontWeight: "bold",
-                              fontSize: { xs: "1rem", sm: "1.25rem" },
-                              color:
-                                entry.type === "clock-in"
-                                  ? "success.main"
-                                  : "error.main",
-                              lineHeight: 1,
-                              display: "flex",
-                              alignItems: "center",
-                            }}
-                          >
-                            {formatTime(entry.timestamp)}
-                          </Typography>
-                          <Chip
-                            label={entry.type === "clock-in" ? "IN" : "OUT"}
-                            color={
-                              entry.type === "clock-in" ? "success" : "error"
-                            }
-                            variant="filled"
-                            size="small"
-                            sx={{
-                              fontSize: { xs: "0.7rem", sm: "0.75rem" },
-                              fontWeight: "bold",
-                              height: { xs: 24, sm: 28 },
-                              minWidth: 40,
-                              justifyContent: "center",
-                              alignSelf: "center",
-                              transform: "translateY(-1px)",
-                            }}
-                          />
-                        </Box>
-                      </Box>
+                      {/* Menu button - outside the row */}
+                      <IconButton
+                        onClick={(e) => handleMenuOpen(e, entry.id)}
+                        size="small"
+                        sx={{
+                          color: "text.secondary",
+                          "&:hover": {
+                            color: "primary.main",
+                            backgroundColor: "action.hover",
+                          },
+                          flexShrink: 0,
+                        }}
+                        aria-label="Entry options"
+                      >
+                        <MoreVert />
+                      </IconButton>
 
-                      {/* Center - Duration and Reason */}
+                      {/* Row content */}
                       <Box
                         sx={{
                           display: "flex",
-                          flexDirection: "column",
                           alignItems: "center",
-                          justifyContent: "center",
-                          flex: 1, // Take up remaining space to center better
-                          maxWidth: 120, // Prevent it from getting too wide
-                          mx: { xs: 1, sm: 1.5 },
-                          minHeight: 48, // Match reduced row height
+                          justifyContent: "space-between",
+                          flex: 1,
+                          py: { xs: 1, sm: 1.25 },
+                          px: { xs: 1.5, sm: 2 },
+                          border: "1px solid",
+                          borderColor: "divider",
+                          borderRadius: 2,
+                          backgroundColor: "background.paper",
+                          minHeight: 48,
+                          "&:hover": {
+                            backgroundColor: "action.hover",
+                          },
+                        }}
+                      >
+                        {/* Left side - Time and Badge */}
+                        <Box sx={{ flex: 0, minWidth: 120 }}>
+                          <Box
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 1,
+                              minHeight: 32,
+                            }}
+                          >
+                            <Typography
+                              variant="h6"
+                              sx={{
+                                fontWeight: "bold",
+                                fontSize: { xs: "1rem", sm: "1.25rem" },
+                                color:
+                                  entry.type === "clock-in"
+                                    ? "success.main"
+                                    : "error.main",
+                                lineHeight: 1,
+                                display: "flex",
+                                alignItems: "center",
+                              }}
+                            >
+                              {formatTime(entry.timestamp)}
+                            </Typography>
+                            <Chip
+                              label={entry.type === "clock-in" ? "IN" : "OUT"}
+                              color={
+                                entry.type === "clock-in" ? "success" : "error"
+                              }
+                              variant="filled"
+                              size="small"
+                              sx={{
+                                fontSize: { xs: "0.7rem", sm: "0.75rem" },
+                                fontWeight: "bold",
+                                height: { xs: 24, sm: 28 },
+                                minWidth: 40,
+                                justifyContent: "center",
+                                alignSelf: "center",
+                                transform: "translateY(-1px)",
+                              }}
+                            />
+                          </Box>
+                        </Box>
+
+                        {/* Center - Duration and Reason */}
+                        <Box
+                          sx={{
+                            display: "flex",
+                            flexDirection: "column",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            flex: 1, // Take up remaining space to center better
+                            maxWidth: 120, // Prevent it from getting too wide
+                            mx: { xs: 1, sm: 1.5 },
+                            minHeight: 48, // Match reduced row height
+                          }}
+                        >
+                          <Box
+                            sx={{
+                              display: "flex",
+                              flexDirection: "column",
+                              alignItems: "center",
+                              textAlign: "center",
+                            }}
+                          >
+                            {duration && (
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  color: "text.secondary",
+                                  fontSize: { xs: "0.875rem", sm: "1rem" },
+                                  fontWeight: "medium",
+                                }}
+                              >
+                                {duration}
+                              </Typography>
+                            )}
+                          </Box>
+                        </Box>
+
+                        {/* Right side - Action button */}
+                        <Box
+                          sx={{
+                            display: "flex",
+                            justifyContent: "flex-end",
+                            alignItems: "center",
+                            flex: 0,
+                            minWidth: 100, // Fixed width for consistent positioning
+                            minHeight: 48, // Match reduced row height
+                          }}
+                        >
+                          {showClockBackIn ? (
+                            <Button
+                              onClick={() => onStartDay(false)}
+                              variant="contained"
+                              color="success"
+                              startIcon={<PlayArrow />}
+                              size="medium"
+                              sx={{
+                                fontSize: { xs: "0.875rem", sm: "1rem" },
+                                minHeight: { xs: 40, sm: 44 },
+                                minWidth: 100, // Uniform width for all buttons
+                                px: { xs: 2, sm: 3 },
+                              }}
+                            >
+                              Back In
+                            </Button>
+                          ) : (
+                            <Button
+                              onClick={() => handleToggleEntryClick(entry.id)}
+                              variant="outlined"
+                              color={
+                                entry.type === "clock-in" ? "error" : "success"
+                              }
+                              size="medium"
+                              disabled={!isLatestEntry}
+                              sx={{
+                                fontSize: { xs: "0.875rem", sm: "1rem" },
+                                minHeight: { xs: 40, sm: 44 },
+                                minWidth: 100, // Uniform width for all buttons
+                                px: { xs: 2, sm: 3 },
+                              }}
+                            >
+                              {entry.type === "clock-in"
+                                ? "Clock Out"
+                                : "Clock In"}
+                            </Button>
+                          )}
+                        </Box>
+                      </Box>
+                    </Box>
+
+                    {/* Tracking Period Boundary Separator - shown after entry that crosses boundary */}
+                    {boundary && (
+                      <Box
+                        sx={{
+                          my: 2,
+                          py: 2,
+                          px: 2,
+                          border: "2px dashed",
+                          borderColor: "warning.main",
+                          borderRadius: 2,
+                          backgroundColor: "warning.dark",
+                          position: "relative",
                         }}
                       >
                         <Box
@@ -1003,75 +1247,60 @@ export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
                             display: "flex",
                             flexDirection: "column",
                             alignItems: "center",
-                            textAlign: "center",
+                            gap: 1,
                           }}
                         >
-                          {duration && (
-                            <Typography
-                              variant="body2"
-                              sx={{
-                                color: "text.secondary",
-                                fontSize: { xs: "0.875rem", sm: "1rem" },
-                                fontWeight: "medium",
-                              }}
-                            >
-                              {duration}
-                            </Typography>
-                          )}
+                          <Typography
+                            variant="h6"
+                            sx={{
+                              fontWeight: "bold",
+                              color: "warning.contrastText",
+                              textAlign: "center",
+                            }}
+                          >
+                            ⚠️ Tracking Period Boundary Crossed
+                          </Typography>
+                          <Typography
+                            variant="body1"
+                            sx={{
+                              color: "warning.contrastText",
+                              fontWeight: "medium",
+                            }}
+                          >
+                            {boundary.toLocaleDateString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                            })}{" "}
+                            at 12:00 PM
+                          </Typography>
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              color: "warning.contrastText",
+                              opacity: 0.9,
+                            }}
+                          >
+                            Hours accrued on previous time card:{" "}
+                            <strong>
+                              {formatDuration(hoursBeforeBoundary)}
+                            </strong>
+                          </Typography>
+                          <Typography
+                            variant="caption"
+                            sx={{
+                              color: "warning.contrastText",
+                              opacity: 0.8,
+                              textAlign: "center",
+                              mt: 0.5,
+                            }}
+                          >
+                            Entries below this line count toward the new
+                            tracking period
+                          </Typography>
                         </Box>
                       </Box>
-
-                      {/* Right side - Action button */}
-                      <Box
-                        sx={{
-                          display: "flex",
-                          justifyContent: "flex-end",
-                          alignItems: "center",
-                          flex: 0,
-                          minWidth: 100, // Fixed width for consistent positioning
-                          minHeight: 48, // Match reduced row height
-                        }}
-                      >
-                        {showClockBackIn ? (
-                          <Button
-                            onClick={() => onStartDay(false)}
-                            variant="contained"
-                            color="success"
-                            startIcon={<PlayArrow />}
-                            size="medium"
-                            sx={{
-                              fontSize: { xs: "0.875rem", sm: "1rem" },
-                              minHeight: { xs: 40, sm: 44 },
-                              minWidth: 100, // Uniform width for all buttons
-                              px: { xs: 2, sm: 3 },
-                            }}
-                          >
-                            Back In
-                          </Button>
-                        ) : (
-                          <Button
-                            onClick={() => handleToggleEntryClick(entry.id)}
-                            variant="outlined"
-                            color={
-                              entry.type === "clock-in" ? "error" : "success"
-                            }
-                            size="medium"
-                            disabled={!isLatestEntry}
-                            sx={{
-                              fontSize: { xs: "0.875rem", sm: "1rem" },
-                              minHeight: { xs: 40, sm: 44 },
-                              minWidth: 100, // Uniform width for all buttons
-                              px: { xs: 2, sm: 3 },
-                            }}
-                          >
-                            {entry.type === "clock-in"
-                              ? "Clock Out"
-                              : "Clock In"}
-                          </Button>
-                        )}
-                      </Box>
-                    </Box>
-                  </Box>
+                    )}
+                  </React.Fragment>
                 );
               })}
             </Box>
