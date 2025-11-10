@@ -506,12 +506,8 @@ export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
         sx={{
           display: "flex",
           alignItems: "center",
-          gap: 1,
         }}
       >
-        {/* Spacer for menu button - matches normal entry */}
-        <Box sx={{ width: 40, flexShrink: 0 }} />
-
         {/* Row content - matches normal entry layout exactly */}
         <Box
           sx={{
@@ -837,10 +833,35 @@ export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
     boundary: Date,
     hoursBeforeBoundary: number
   ) => {
+    // Derive previous and new pay period bounds from the boundary (12:00 PM)
+    const previousStart = new Date(boundary);
+    previousStart.setDate(previousStart.getDate() - 1);
+    previousStart.setHours(TRACKING_PERIOD_START_HOUR, 0, 0, 0); // 12:00 PM previous day
+
+    const previousEnd = new Date(boundary);
+    previousEnd.setHours(TRACKING_PERIOD_START_HOUR - 1, 59, 0, 0); // 11:59 AM boundary day
+
+    const newStart = new Date(boundary); // 12:00 PM boundary day
+
+    const newEnd = new Date(boundary);
+    newEnd.setDate(newEnd.getDate() + 1);
+    newEnd.setHours(TRACKING_PERIOD_START_HOUR - 1, 59, 0, 0); // 11:59 AM next day
+
+    const formatPart = (date: Date): string => {
+      const weekday = date.toLocaleDateString("en-US", { weekday: "short" });
+      const month = date.toLocaleDateString("en-US", { month: "short" });
+      const day = date.getDate();
+      const time = date.toLocaleTimeString("en-US", {
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+      });
+      return `${weekday}. ${month}. ${day} ${time}`;
+    };
+
     return (
       <Box
         sx={{
-          my: 2,
           py: 2,
           px: 2,
           border: "2px dashed",
@@ -855,7 +876,6 @@ export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
-            gap: 1,
           }}
         >
           <Typography
@@ -866,42 +886,41 @@ export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
               textAlign: "center",
             }}
           >
-            ⚠️ Tracking Period Boundary Crossed
+            ⚠️ New Pay Period Started ⚠️
           </Typography>
-          <Typography
-            variant="body1"
-            sx={{
-              color: "warning.contrastText",
-              fontWeight: "medium",
-            }}
-          >
-            {boundary.toLocaleDateString("en-US", {
-              month: "short",
-              day: "numeric",
-            })}{" "}
-            at 12:00 PM
-          </Typography>
-          <Typography
+          {/* <Typography
             variant="body2"
             sx={{
-              color: "warning.contrastText",
-              opacity: 0.9,
-            }}
-          >
-            Hours accrued on previous time card:{" "}
-            <strong>{formatDuration(hoursBeforeBoundary)}</strong>
-          </Typography>
-          <Typography
-            variant="caption"
-            sx={{
-              color: "warning.contrastText",
-              opacity: 0.8,
+              color: "black",
+              fontSize: { xs: "0.875rem", sm: "0.95rem" },
+              letterSpacing: 0.05,
               textAlign: "center",
-              mt: 0.5,
             }}
           >
-            Entries below this line count toward the new tracking period
-          </Typography>
+            <strong>Time Worked: {formatDuration(hoursBeforeBoundary)}</strong>
+          </Typography> */}
+          <Box sx={{ textAlign: "left", mt: 1 }}>
+            <Typography
+              variant="body2"
+              sx={{
+                color: "warning.contrastText",
+                opacity: 0.95,
+              }}
+            >
+              <strong>Previous:</strong> {formatPart(previousStart)} -{" "}
+              {formatPart(previousEnd)}
+            </Typography>
+            <Typography
+              variant="body2"
+              sx={{
+                color: "warning.contrastText",
+                opacity: 0.95,
+              }}
+            >
+              <strong>New:</strong> {formatPart(newStart)} -{" "}
+              {formatPart(newEnd)}
+            </Typography>
+          </Box>
         </Box>
       </Box>
     );
@@ -1400,7 +1419,7 @@ export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
                           fontSize: { xs: "0.75rem", sm: "0.875rem" },
                         }}
                       >
-                        Tracking Period:{" "}
+                        <strong>Current Pay Period:</strong>{" "}
                         {(() => {
                           const start = getTrackingPeriodStart();
                           const end = getTrackingPeriodEnd();
@@ -1412,17 +1431,11 @@ export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
                             day: "numeric",
                           })} 11:59am`;
                         })()}
-                      </Typography>
-                      <Typography
-                        variant="body2"
-                        sx={{
-                          opacity: 0.9,
-                          fontSize: { xs: "0.75rem", sm: "0.875rem" },
-                        }}
-                      >
-                        Target: {getTargetHoursForTrackingPeriod()}h
+                        {/* <br />
+                        <strong>Maximum Worked Time:</strong>{" "}
+                        {getTargetHoursForTrackingPeriod()}h 0m */}
                         <br />
-                        Worked:{" "}
+                        <strong>Current Time Worked:</strong>{" "}
                         {formatDuration(calculateWorkTimeInTrackingPeriod())}
                       </Typography>
                     </Box>
@@ -1732,7 +1745,8 @@ export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
                           {/* Tracking Period Boundary Separator */}
                           {renderBoundarySeparator(
                             boundary,
-                            hoursBeforeBoundary
+                            hoursBeforeBoundary +
+                              (startDayBookendEntry?.totalMinutes || 0)
                           )}
 
                           {/* After boundary bookend entry (shows forced clock-in at 12:00pm) */}
@@ -1756,7 +1770,11 @@ export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
                               )}
                             </>
                           )}
-                        {renderBoundarySeparator(boundary, hoursBeforeBoundary)}
+                        {renderBoundarySeparator(
+                          boundary,
+                          hoursBeforeBoundary +
+                            (startDayBookendEntry?.totalMinutes || 0)
+                        )}
                         {entry.type === "clock-out" &&
                           nextEntry &&
                           nextEntry.type === "clock-in" && (
@@ -1796,7 +1814,11 @@ export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
                           last.timestamp,
                           new Date(boundary.getTime() - 60000)
                         )}
-                      {renderBoundarySeparator(boundary, hoursBeforeBoundary)}
+                      {renderBoundarySeparator(
+                        boundary,
+                        hoursBeforeBoundary +
+                          (startDayBookendEntry?.totalMinutes || 0)
+                      )}
                       {/* If still clocked out, show break from boundary to now */}
                       {last.type === "clock-out" &&
                         renderVirtualBreakRow(boundary, now)}
