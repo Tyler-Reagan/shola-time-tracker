@@ -11,7 +11,11 @@ import { DiscountCalculator } from "../src/components/DiscountCalculator";
 import { CustomTabs } from "../src/components/Tabs";
 import { TimeSimulatorPanel } from "./components/TimeSimulatorPanel";
 import { TimeEntry, DayState } from "./types";
-import { loadDayState, saveDayState, isStorageAvailable } from "./utils/storage";
+import {
+  loadDayState,
+  saveDayState,
+  isStorageAvailable,
+} from "./utils/storage";
 import { getCurrentTime } from "./utils/timeSimulator";
 
 // Create a dark theme for the app
@@ -236,7 +240,7 @@ function App() {
   const [activeTab, setActiveTab] = useState<
     "work-hours-tracker" | "discount-calculator"
   >("work-hours-tracker");
-  
+
   // Initialize dayState from localStorage if available
   const [dayState, setDayState] = useState<DayState>(() => {
     if (isStorageAvailable()) {
@@ -354,7 +358,10 @@ function App() {
 
       // Update startTime if we deleted the first entry and there's still a clock-in entry
       let updatedStartTime = prev.startTime;
-      if (filteredEntries.length > 0 && filteredEntries[0].type === "clock-in") {
+      if (
+        filteredEntries.length > 0 &&
+        filteredEntries[0].type === "clock-in"
+      ) {
         updatedStartTime = filteredEntries[0].timestamp;
       } else if (filteredEntries.length === 0) {
         updatedStartTime = undefined;
@@ -408,7 +415,8 @@ function App() {
         >
           {activeTab === "work-hours-tracker" && (
             <>
-              <TimeSimulatorPanel />
+              {/* ONLY ENABLE THIS WHEN DEBUGGING AND TESTING */}
+              {/* <TimeSimulatorPanel /> */}
               <WorkHoursTracker
                 dayState={dayState}
                 onStartDay={handleStartDay}

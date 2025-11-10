@@ -33,6 +33,755 @@ import {
 import { DayState } from "../types";
 import { getCurrentTime, isSimulationActive } from "../utils/timeSimulator";
 
+/**
+ * Component: WorkHoursTrackerHeader
+ * Contains the header card with title, tracking period info, start/end day buttons, and stats cards
+ */
+interface WorkHoursTrackerHeaderProps {
+  dayState: DayState;
+  isActive: boolean;
+  onStartDayClick: () => void;
+  onEndDayClick: () => void;
+  formatTrackingPeriodLabel: () => string;
+  getTotalWorkTime: () => string;
+  getTotalBreakTimeInTrackingPeriod: () => string;
+  getTargetHoursForTrackingPeriod: () => number;
+  getRemainingMinutesInPayPeriod: () => number;
+  getClockOutTime: () => string;
+  calculateWorkTimeInTrackingPeriod: () => number;
+  formatDuration: (minutes: number) => string;
+  TrackingPeriodInfo: React.FC<{
+    periodLabel: string;
+    workedLabel: string;
+    color: string;
+  }>;
+}
+
+const WorkHoursTrackerHeader: React.FC<WorkHoursTrackerHeaderProps> = ({
+  dayState,
+  isActive,
+  onStartDayClick,
+  onEndDayClick,
+  formatTrackingPeriodLabel,
+  getTotalWorkTime,
+  getTotalBreakTimeInTrackingPeriod,
+  getTargetHoursForTrackingPeriod,
+  getRemainingMinutesInPayPeriod,
+  getClockOutTime,
+  calculateWorkTimeInTrackingPeriod,
+  formatDuration,
+  TrackingPeriodInfo,
+}) => {
+  return (
+    <Card>
+      <CardHeader
+        sx={{
+          flexDirection: { xs: "column", sm: "row" },
+          alignItems: { xs: "stretch", sm: "center" },
+          gap: { xs: 2, sm: 0 },
+          "& .MuiCardHeader-action": {
+            alignSelf: { xs: "stretch", sm: "center" },
+            margin: 0,
+            padding: 0,
+            width: { xs: "100%", sm: "auto" },
+          },
+        }}
+        title={
+          <>
+            <Typography
+              variant="h4"
+              sx={{
+                fontWeight: "bold",
+                fontSize: { xs: "1.5rem", sm: "2rem", md: "2.125rem" },
+                textAlign: { xs: "center", sm: "left" },
+              }}
+            >
+              Work Hours Tracker
+            </Typography>
+            <Typography
+              variant="body1"
+              sx={{
+                fontWeight: "medium",
+                textAlign: { xs: "center", sm: "left" },
+              }}
+            >
+              Times are with respect to the tracking period: <br />
+              <strong>{formatTrackingPeriodLabel()}</strong>
+            </Typography>
+          </>
+        }
+        action={
+          !isActive ? (
+            <Button
+              onClick={onStartDayClick}
+              variant="contained"
+              color="success"
+              startIcon={<PlayArrow />}
+              size="large"
+              fullWidth
+              sx={{
+                minHeight: { xs: 48, sm: 36 },
+                fontSize: { xs: "1rem", sm: "0.875rem" },
+                width: { xs: "100%", sm: "auto" },
+              }}
+            >
+              Start New Day
+            </Button>
+          ) : (
+            <Button
+              onClick={onEndDayClick}
+              variant="contained"
+              color="error"
+              startIcon={<Stop />}
+              size="large"
+              fullWidth
+              sx={{
+                minHeight: { xs: 48, sm: 36 },
+                fontSize: { xs: "1rem", sm: "0.875rem" },
+                width: { xs: "100%", sm: "auto" },
+              }}
+            >
+              End Day
+            </Button>
+          )
+        }
+      />
+
+      {/* Work Time stats cards display */}
+      {dayState.entries.length > 0 && (
+        <CardContent sx={{ pt: 0 }}>
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            {/* Total Time Worked Card */}
+            <Alert
+              severity="info"
+              icon={<AccessTime />}
+              sx={{
+                backgroundColor: "primary.light",
+                color: "primary.contrastText",
+                "& .MuiAlert-icon": {
+                  color: "primary.contrastText",
+                },
+              }}
+            >
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <Typography variant="h6" sx={{ fontWeight: "bold" }}>
+                  Time Clocked In: {getTotalWorkTime()}
+                </Typography>
+              </Box>
+            </Alert>
+
+            {/* Total Break Time Card */}
+            <Alert
+              severity="warning"
+              icon={<Coffee />}
+              sx={{
+                backgroundColor: "warning.light",
+                color: "warning.contrastText",
+                "& .MuiAlert-icon": {
+                  color: "warning.contrastText",
+                },
+              }}
+            >
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <Typography variant="h6" sx={{ fontWeight: "bold" }}>
+                  Time Clocked Out: {getTotalBreakTimeInTrackingPeriod()}
+                </Typography>
+              </Box>
+            </Alert>
+
+            {/* Must Clock Out By Card */}
+            {(() => {
+              // Compute derived UI state once for the alert
+              const hasSchedule = getTargetHoursForTrackingPeriod() > 0;
+              const remainingMinutes = getRemainingMinutesInPayPeriod();
+              const overtime = hasSchedule && remainingMinutes <= 0;
+              const approaching =
+                hasSchedule && remainingMinutes > 0 && remainingMinutes <= 60;
+              const severity = !hasSchedule
+                ? "info"
+                : overtime
+                ? "error"
+                : approaching
+                ? "warning"
+                : "success";
+              const bgColor = !hasSchedule
+                ? "info.light"
+                : overtime
+                ? "error.light"
+                : approaching
+                ? "warning.light"
+                : "success.light";
+              const textColor = !hasSchedule
+                ? "info.contrastText"
+                : overtime
+                ? "error.contrastText"
+                : approaching
+                ? "warning.contrastText"
+                : "success.contrastText";
+              const border =
+                !hasSchedule || (!approaching && !overtime)
+                  ? "none"
+                  : "3px solid";
+              const borderColor = !hasSchedule
+                ? "transparent"
+                : overtime
+                ? "error.main"
+                : "warning.main";
+
+              return (
+                <Alert
+                  severity={
+                    severity as "info" | "error" | "warning" | "success"
+                  }
+                  icon={<Schedule />}
+                  sx={{
+                    backgroundColor: bgColor,
+                    color: textColor,
+                    "& .MuiAlert-icon": {
+                      color: textColor,
+                    },
+                    border,
+                    borderColor,
+                    fontSize: { xs: "1rem", sm: "1.125rem" },
+                    fontWeight: "bold",
+                  }}
+                >
+                  <Box
+                    sx={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 1,
+                    }}
+                  >
+                    <Typography variant="h6" sx={{ fontWeight: "bold" }}>
+                      Must Clock Out By: {getClockOutTime()}
+                    </Typography>
+                    {approaching && (
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          opacity: 0.9,
+                          fontSize: { xs: "0.75rem", sm: "0.875rem" },
+                        }}
+                      >
+                        Approaching limit: ≤ 1 hour remaining to 9h
+                      </Typography>
+                    )}
+                    {overtime && (
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          opacity: 0.9,
+                          fontSize: { xs: "0.75rem", sm: "0.875rem" },
+                        }}
+                      >
+                        Overtime: over target for this pay period
+                      </Typography>
+                    )}
+                    <TrackingPeriodInfo
+                      periodLabel={formatTrackingPeriodLabel()}
+                      workedLabel={formatDuration(
+                        calculateWorkTimeInTrackingPeriod()
+                      )}
+                      color={textColor}
+                    />
+                  </Box>
+                </Alert>
+              );
+            })()}
+          </Box>
+        </CardContent>
+      )}
+    </Card>
+  );
+};
+
+// Component: TimeEntriesTable
+// Contains the time entries list with bookend entries, boundary separators, and entry management
+interface TimeEntriesTableProps {
+  dayState: DayState;
+  currentDate: string;
+  startDayBookendEntry: {
+    periodStart: Date;
+    periodEnd: Date;
+    totalMinutes: number;
+  } | null;
+  endDaySummary: {
+    periodStart: Date;
+    periodEnd: Date;
+    totalMinutes: number;
+  } | null;
+  onStartDay: (clearExisting?: boolean) => void;
+  onToggleEntry: (entryId: string) => void;
+  handleMenuOpen: (
+    event: React.MouseEvent<HTMLElement>,
+    entryId: string
+  ) => void;
+  formatTime: (date: Date) => string;
+  formatDuration: (minutes: number) => string;
+  getDurationForEntry: (entry: any, index: number) => string;
+  getTrackingPeriodBoundary: (entry: Date, nextEntry?: Date) => Date | null;
+  getPayPeriodDayNumber: (periodStart: Date) => number;
+  getCurrentTime: () => Date;
+  renderVirtualEntryRow: (
+    clockInTime: Date,
+    clockOutTime: Date
+  ) => React.ReactElement;
+  renderVirtualBreakRow: (
+    clockOutTime: Date,
+    clockInTime: Date
+  ) => React.ReactElement | null;
+  renderBoundarySeparator: (boundary: Date) => React.ReactElement;
+}
+
+const TimeEntriesTable: React.FC<TimeEntriesTableProps> = ({
+  dayState,
+  currentDate,
+  startDayBookendEntry,
+  endDaySummary,
+  onStartDay,
+  onToggleEntry,
+  handleMenuOpen,
+  formatTime,
+  formatDuration,
+  getDurationForEntry,
+  getTrackingPeriodBoundary,
+  getPayPeriodDayNumber,
+  getCurrentTime,
+  renderVirtualEntryRow,
+  renderVirtualBreakRow,
+  renderBoundarySeparator,
+}) => {
+  if (dayState.entries.length === 0) {
+    return null;
+  }
+
+  return (
+    <Card>
+      <CardHeader
+        title={
+          <Typography
+            variant="h6"
+            sx={{
+              fontSize: { xs: "1rem", sm: "1.25rem" },
+              textAlign: { xs: "center", sm: "left" },
+            }}
+          >
+            Time Entries ({currentDate})
+          </Typography>
+        }
+      />
+      <CardContent sx={{ pt: 0 }}>
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+          {/* Start Day Bookend Entry - shows previous period hours at start of new day */}
+          {startDayBookendEntry &&
+            (() => {
+              const s = startDayBookendEntry;
+              return (
+                <>
+                  {renderVirtualEntryRow(
+                    s.periodStart,
+                    getCurrentTime() < s.periodEnd
+                      ? getCurrentTime()
+                      : s.periodEnd
+                  )}
+                  <Box
+                    sx={{
+                      mb: 1,
+                      py: 0.5,
+                      px: 1.5,
+                      backgroundColor: "info.dark",
+                      borderRadius: 1,
+                      textAlign: "center",
+                    }}
+                  >
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        color: "info.contrastText",
+                        fontWeight: "medium",
+                      }}
+                    >
+                      Day {getPayPeriodDayNumber(s.periodStart)}:{" "}
+                      {formatDuration(s.totalMinutes)} worked in previous period
+                      (still part of ongoing pay period)
+                    </Typography>
+                  </Box>
+                </>
+              );
+            })()}
+
+          {dayState.entries.map((entry, index) => {
+            const isLatestEntry = index === dayState.entries.length - 1;
+            const showClockBackIn =
+              !dayState.isActive && isLatestEntry && entry.type === "clock-out";
+            const duration = getDurationForEntry(entry, index);
+            const nextEntry = dayState.entries[index + 1];
+            // Check if the current entry and next entry cross a boundary
+            const boundary = nextEntry
+              ? getTrackingPeriodBoundary(entry.timestamp, nextEntry.timestamp)
+              : null;
+
+            // Check if this entry spans the boundary (clock-in before 12pm, clock-out after 12pm)
+            const entrySpansBoundary =
+              boundary &&
+              entry.type === "clock-in" &&
+              nextEntry &&
+              nextEntry.type === "clock-out" &&
+              entry.timestamp < boundary &&
+              nextEntry.timestamp > boundary;
+
+            // Create bookend entries if entry spans boundary
+            const beforeBoundaryEntry = entrySpansBoundary
+              ? {
+                  clockIn: entry.timestamp,
+                  clockOut: new Date(boundary.getTime() - 60000), // 11:59am
+                }
+              : null;
+            const afterBoundaryEntry = entrySpansBoundary
+              ? {
+                  clockIn: boundary, // 12:00pm
+                  clockOut: nextEntry.timestamp,
+                }
+              : null;
+
+            return (
+              <React.Fragment key={entry.id}>
+                {/* Always show the original entry */}
+                {/* Entry Row */}
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 1,
+                  }}
+                >
+                  {/* Menu button - outside the row */}
+                  <IconButton
+                    onClick={(e) => handleMenuOpen(e, entry.id)}
+                    size="small"
+                    sx={{
+                      color: "text.secondary",
+                      "&:hover": {
+                        color: "primary.main",
+                        backgroundColor: "action.hover",
+                      },
+                      flexShrink: 0,
+                    }}
+                    aria-label="Entry options"
+                  >
+                    <MoreVert />
+                  </IconButton>
+
+                  {/* Row content */}
+                  <Box
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      flex: 1,
+                      py: { xs: 1, sm: 1.25 },
+                      px: { xs: 1.5, sm: 2 },
+                      border: "1px solid",
+                      borderColor: "divider",
+                      borderRadius: 2,
+                      backgroundColor: "background.paper",
+                      minHeight: 48,
+                      "&:hover": {
+                        backgroundColor: "action.hover",
+                      },
+                    }}
+                  >
+                    {/* Left side - Time and Badge */}
+                    <Box sx={{ flex: 0, minWidth: 120 }}>
+                      <Box
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 1,
+                          minHeight: 32,
+                        }}
+                      >
+                        <Typography
+                          variant="h6"
+                          sx={{
+                            fontWeight: "bold",
+                            fontSize: { xs: "1rem", sm: "1.25rem" },
+                            color:
+                              entry.type === "clock-in"
+                                ? "success.main"
+                                : "error.main",
+                            lineHeight: 1,
+                            display: "flex",
+                            alignItems: "center",
+                          }}
+                        >
+                          {formatTime(entry.timestamp)}
+                        </Typography>
+                        <Chip
+                          label={entry.type === "clock-in" ? "IN" : "OUT"}
+                          color={
+                            entry.type === "clock-in" ? "success" : "error"
+                          }
+                          variant="filled"
+                          size="small"
+                          sx={{
+                            fontSize: { xs: "0.7rem", sm: "0.75rem" },
+                            fontWeight: "bold",
+                            height: { xs: 24, sm: 28 },
+                            minWidth: 40,
+                            justifyContent: "center",
+                            alignSelf: "center",
+                            transform: "translateY(-1px)",
+                          }}
+                        />
+                      </Box>
+                    </Box>
+
+                    {/* Center - Duration and Reason */}
+                    <Box
+                      sx={{
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flex: 1, // Take up remaining space to center better
+                        maxWidth: 120, // Prevent it from getting too wide
+                        mx: { xs: 1, sm: 1.5 },
+                        minHeight: 48, // Match reduced row height
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "center",
+                          textAlign: "center",
+                        }}
+                      >
+                        {duration && (
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              color: "text.secondary",
+                              fontSize: { xs: "0.875rem", sm: "1rem" },
+                              fontWeight: "medium",
+                            }}
+                          >
+                            {duration}
+                          </Typography>
+                        )}
+                      </Box>
+                    </Box>
+
+                    {/* Right side - Action button */}
+                    <Box
+                      sx={{
+                        display: "flex",
+                        justifyContent: "flex-end",
+                        alignItems: "center",
+                        flex: 0,
+                        minWidth: 100, // Fixed width for consistent positioning
+                        minHeight: 48, // Match reduced row height
+                      }}
+                    >
+                      {showClockBackIn ? (
+                        <Button
+                          onClick={() => onStartDay(false)}
+                          variant="contained"
+                          color="success"
+                          startIcon={<PlayArrow />}
+                          size="medium"
+                          sx={{
+                            fontSize: { xs: "0.875rem", sm: "1rem" },
+                            minHeight: { xs: 40, sm: 44 },
+                            minWidth: 100, // Uniform width for all buttons
+                            px: { xs: 2, sm: 3 },
+                          }}
+                        >
+                          Back In
+                        </Button>
+                      ) : (
+                        <Button
+                          onClick={() => onToggleEntry(entry.id)}
+                          variant="outlined"
+                          color={
+                            entry.type === "clock-in" ? "error" : "success"
+                          }
+                          size="medium"
+                          disabled={!isLatestEntry}
+                          sx={{
+                            fontSize: { xs: "0.875rem", sm: "1rem" },
+                            minHeight: { xs: 40, sm: 44 },
+                            minWidth: 100, // Uniform width for all buttons
+                            px: { xs: 2, sm: 3 },
+                          }}
+                        >
+                          {entry.type === "clock-in" ? "Clock Out" : "Clock In"}
+                        </Button>
+                      )}
+                    </Box>
+                  </Box>
+                </Box>
+
+                {/* If this entry spans boundary, insert bookend entries after it */}
+                {entrySpansBoundary &&
+                  beforeBoundaryEntry &&
+                  afterBoundaryEntry &&
+                  boundary && (
+                    <>
+                      {/* Before boundary bookend entry (shows forced clock-out at 11:59am) */}
+                      {renderVirtualEntryRow(
+                        beforeBoundaryEntry.clockIn,
+                        beforeBoundaryEntry.clockOut
+                      )}
+
+                      {/* Tracking Period Boundary Separator */}
+                      {renderBoundarySeparator(boundary)}
+
+                      {/* After boundary bookend entry (shows forced clock-in at 12:00pm) */}
+                      {renderVirtualEntryRow(
+                        afterBoundaryEntry.clockIn,
+                        afterBoundaryEntry.clockOut
+                      )}
+                    </>
+                  )}
+
+                {/* Tracking Period Boundary Separator - shown after entry that crosses boundary (for non-spanning boundaries) */}
+                {boundary && !entrySpansBoundary && (
+                  <>
+                    {entry.type === "clock-out" &&
+                      nextEntry &&
+                      nextEntry.type === "clock-in" && (
+                        <>
+                          {renderVirtualBreakRow(
+                            entry.timestamp,
+                            new Date(boundary.getTime() - 60000)
+                          )}
+                        </>
+                      )}
+                    {renderBoundarySeparator(boundary)}
+                    {entry.type === "clock-out" &&
+                      nextEntry &&
+                      nextEntry.type === "clock-in" && (
+                        <>
+                          {renderVirtualBreakRow(boundary, nextEntry.timestamp)}
+                        </>
+                      )}
+                  </>
+                )}
+              </React.Fragment>
+            );
+          })}
+
+          {/* Virtual boundary when the user crossed into a new pay period while clocked out (no next entry yet) */}
+          {!dayState.isActive &&
+            dayState.entries.length > 0 &&
+            (() => {
+              const last = dayState.entries[dayState.entries.length - 1];
+              const now = getCurrentTime();
+              const boundary = getTrackingPeriodBoundary(last.timestamp, now);
+              if (!boundary) return null;
+              return (
+                <>
+                  {/* Break before boundary */}
+                  {last.type === "clock-out" &&
+                    renderVirtualBreakRow(
+                      last.timestamp,
+                      new Date(boundary.getTime() - 60000)
+                    )}
+                  {renderBoundarySeparator(boundary)}
+                  {/* If still clocked out, show break from boundary to now */}
+                  {last.type === "clock-out" &&
+                    renderVirtualBreakRow(boundary, now)}
+                </>
+              );
+            })()}
+
+          {/* End Day Summary - shows ongoing pay period time when day is ended */}
+          {endDaySummary &&
+            !dayState.isActive &&
+            (() => {
+              const s = endDaySummary;
+              return (
+                <>
+                  <Box
+                    sx={{
+                      my: 2,
+                      py: 1,
+                      px: 2,
+                      borderTop: "2px solid",
+                      borderBottom: "2px solid",
+                      borderColor: "divider",
+                    }}
+                  >
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        color: "text.secondary",
+                        textAlign: "center",
+                        display: "block",
+                      }}
+                    >
+                      Day Ended - Ongoing Pay Period Summary
+                    </Typography>
+                  </Box>
+                  {renderVirtualEntryRow(s.periodStart, s.periodEnd)}
+                  <Box
+                    sx={{
+                      mt: 1,
+                      mb: 2,
+                      py: 1,
+                      px: 2,
+                      backgroundColor: "info.dark",
+                      borderRadius: 1,
+                      textAlign: "center",
+                    }}
+                  >
+                    <Typography
+                      variant="body2"
+                      sx={{
+                        color: "info.contrastText",
+                        fontWeight: "medium",
+                      }}
+                    >
+                      Total Time Worked in Ongoing Pay Period:{" "}
+                      <strong>{formatDuration(s.totalMinutes)}</strong>
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        color: "info.contrastText",
+                        opacity: 0.9,
+                        display: "block",
+                        mt: 0.5,
+                      }}
+                    >
+                      This time will carry over into the next day's pay period
+                      (ends at 11:59am)
+                    </Typography>
+                  </Box>
+                </>
+              );
+            })()}
+        </Box>
+      </CardContent>
+    </Card>
+  );
+};
+
 interface WorkHoursTrackerProps {
   dayState: DayState;
   onStartDay: (clearExisting?: boolean) => void;
@@ -153,25 +902,49 @@ export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
     return `${hours}h ${remainingMinutes}m`;
   };
 
+  // Shared compact date-time formatter: "Sun. Nov. 16 12:00 PM"
+  const formatDateTimeCompact = (date: Date): string => {
+    const weekday = date.toLocaleDateString("en-US", { weekday: "short" });
+    const month = date.toLocaleDateString("en-US", { month: "short" });
+    const day = date.getDate();
+    const time = date.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
+    return `${weekday}. ${month}. ${day} ${time}`;
+  };
+
   // Formats the current tracking period as "Sun. Nov. 16 12:00 PM - Mon. Nov. 17 11:59 AM"
   const formatTrackingPeriodLabel = (): string => {
     const start = getTrackingPeriodStart();
     const end = getTrackingPeriodEnd();
 
-    const formatPart = (date: Date): string => {
-      const weekday = date.toLocaleDateString("en-US", { weekday: "short" });
-      const month = date.toLocaleDateString("en-US", { month: "short" });
-      const day = date.getDate();
-      const time = date.toLocaleTimeString("en-US", {
-        hour: "numeric",
-        minute: "2-digit",
-        hour12: true,
-      });
-      // Add periods after weekday and month abbreviations to match requested style
-      return `${weekday}. ${month}. ${day} ${time}`;
-    };
+    return `${formatDateTimeCompact(start)} - ${formatDateTimeCompact(end)}`;
+  };
 
-    return `${formatPart(start)} - ${formatPart(end)}`;
+  // Local presentational component for the period info block inside the alert
+  const TrackingPeriodInfo: React.FC<{
+    periodLabel: string;
+    workedLabel: string;
+    color?: string;
+  }> = ({ periodLabel, workedLabel, color }) => {
+    return (
+      <>
+        <Typography
+          variant="body2"
+          sx={{
+            opacity: 0.9,
+            fontSize: { xs: "0.75rem", sm: "0.875rem" },
+            color,
+          }}
+        >
+          <strong>Current Pay Period:</strong> {periodLabel}
+          <br />
+          <strong>Current Time Worked:</strong> {workedLabel}
+        </Typography>
+      </>
+    );
   };
 
   // Tracking period constants and utilities
@@ -431,44 +1204,7 @@ export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
     return null;
   };
 
-  /**
-   * Calculates hours worked in a tracking period up to a boundary
-   * Handles entries that span the boundary (e.g., clock-in before 12pm, clock-out after 12pm)
-   */
-  const calculateHoursUpToBoundary = (
-    entries: typeof dayState.entries,
-    boundaryDate: Date
-  ): number => {
-    let totalMinutes = 0;
-    let clockInTime: Date | null = null;
-
-    for (const entry of entries) {
-      if (entry.type === "clock-in") {
-        clockInTime = entry.timestamp;
-      } else if (entry.type === "clock-out" && clockInTime) {
-        // If clock-in is before boundary and clock-out is after boundary,
-        // count only the time from clock-in to boundary
-        if (clockInTime < boundaryDate && entry.timestamp > boundaryDate) {
-          const diffMs = boundaryDate.getTime() - clockInTime.getTime();
-          totalMinutes += Math.floor(diffMs / (1000 * 60));
-        } else if (entry.timestamp <= boundaryDate) {
-          // Both are before or at boundary, count full duration
-          const diffMs = entry.timestamp.getTime() - clockInTime.getTime();
-          totalMinutes += Math.floor(diffMs / (1000 * 60));
-        }
-        // If both are after boundary, don't count (already in new period)
-        clockInTime = null;
-      }
-    }
-
-    // If there's an active clock-in that extends to boundary, count it
-    if (clockInTime && clockInTime < boundaryDate) {
-      const diffMs = boundaryDate.getTime() - clockInTime.getTime();
-      totalMinutes += Math.floor(diffMs / (1000 * 60));
-    }
-
-    return totalMinutes;
-  };
+  // calculateHoursUpToBoundary removed (no longer needed after compact boundary UI).
 
   const getDurationForEntry = (entry: any, index: number): string => {
     const isLatestRow = index === dayState.entries.length - 1;
@@ -829,35 +1565,22 @@ export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
     );
   };
 
-  const renderBoundarySeparator = (
-    boundary: Date,
-    hoursBeforeBoundary: number
-  ) => {
-    // Derive previous and new pay period bounds from the boundary (12:00 PM)
+  const getPeriodBoundsFromBoundary = (boundary: Date) => {
     const previousStart = new Date(boundary);
     previousStart.setDate(previousStart.getDate() - 1);
-    previousStart.setHours(TRACKING_PERIOD_START_HOUR, 0, 0, 0); // 12:00 PM previous day
-
+    previousStart.setHours(TRACKING_PERIOD_START_HOUR, 0, 0, 0);
     const previousEnd = new Date(boundary);
-    previousEnd.setHours(TRACKING_PERIOD_START_HOUR - 1, 59, 0, 0); // 11:59 AM boundary day
-
-    const newStart = new Date(boundary); // 12:00 PM boundary day
-
+    previousEnd.setHours(TRACKING_PERIOD_START_HOUR - 1, 59, 0, 0);
+    const newStart = new Date(boundary);
     const newEnd = new Date(boundary);
     newEnd.setDate(newEnd.getDate() + 1);
-    newEnd.setHours(TRACKING_PERIOD_START_HOUR - 1, 59, 0, 0); // 11:59 AM next day
+    newEnd.setHours(TRACKING_PERIOD_START_HOUR - 1, 59, 0, 0);
+    return { previousStart, previousEnd, newStart, newEnd };
+  };
 
-    const formatPart = (date: Date): string => {
-      const weekday = date.toLocaleDateString("en-US", { weekday: "short" });
-      const month = date.toLocaleDateString("en-US", { month: "short" });
-      const day = date.getDate();
-      const time = date.toLocaleTimeString("en-US", {
-        hour: "numeric",
-        minute: "2-digit",
-        hour12: true,
-      });
-      return `${weekday}. ${month}. ${day} ${time}`;
-    };
+  const renderBoundarySeparator = (boundary: Date) => {
+    const { previousStart, previousEnd, newStart, newEnd } =
+      getPeriodBoundsFromBoundary(boundary);
 
     return (
       <Box
@@ -907,8 +1630,8 @@ export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
                 opacity: 0.95,
               }}
             >
-              <strong>Previous:</strong> {formatPart(previousStart)} -{" "}
-              {formatPart(previousEnd)}
+              <strong>Previous:</strong> {formatDateTimeCompact(previousStart)}{" "}
+              - {formatDateTimeCompact(previousEnd)}
             </Typography>
             <Typography
               variant="body2"
@@ -917,8 +1640,8 @@ export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
                 opacity: 0.95,
               }}
             >
-              <strong>New:</strong> {formatPart(newStart)} -{" "}
-              {formatPart(newEnd)}
+              <strong>New:</strong> {formatDateTimeCompact(newStart)} -{" "}
+              {formatDateTimeCompact(newEnd)}
             </Typography>
           </Box>
         </Box>
@@ -1179,723 +1902,57 @@ export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
 
   return (
     <Box
-      sx={{ display: "flex", flexDirection: "column", gap: { xs: 2, sm: 3 } }}
+      sx={{ display: "flex", flexDirection: "column", gap: { xs: 1, sm: 2 } }}
     >
       {/* Date Header */}
-      <Typography
+      {/* <Typography
         variant="h6"
         color="text.secondary"
         sx={{
           textAlign: "center",
-          mb: 1,
-          fontSize: { xs: "0.875rem", sm: "1rem" },
+          fontSize: { xs: "1.25rem", sm: "1.5rem" },
+          fontWeight: "bold",
         }}
       >
         {currentDate}
-      </Typography>
+      </Typography> */}
 
       {/* Header Card */}
-      <Card>
-        <CardHeader
-          sx={{
-            flexDirection: { xs: "column", sm: "row" },
-            alignItems: { xs: "stretch", sm: "center" },
-            gap: { xs: 2, sm: 0 },
-            "& .MuiCardHeader-action": {
-              alignSelf: { xs: "stretch", sm: "center" },
-              margin: 0,
-              padding: 0,
-              width: { xs: "100%", sm: "auto" },
-            },
-          }}
-          title={
-            <>
-              <Typography
-                variant="h4"
-                sx={{
-                  fontWeight: "bold",
-                  fontSize: { xs: "1.5rem", sm: "2rem", md: "2.125rem" },
-                  textAlign: { xs: "center", sm: "left" },
-                }}
-              >
-                Work Hours Tracker
-              </Typography>
-              <Typography
-                variant="body1"
-                sx={{
-                  fontWeight: "medium",
-                  textAlign: { xs: "center", sm: "left" },
-                }}
-              >
-                Times are with respect to the tracking period: <br />
-                <strong>{formatTrackingPeriodLabel()}</strong>
-              </Typography>
-            </>
-          }
-          action={
-            !dayState.isActive ? (
-              <Button
-                onClick={handleStartDayClick}
-                variant="contained"
-                color="success"
-                startIcon={<PlayArrow />}
-                size="large"
-                fullWidth
-                sx={{
-                  minHeight: { xs: 48, sm: 36 },
-                  fontSize: { xs: "1rem", sm: "0.875rem" },
-                  width: { xs: "100%", sm: "auto" },
-                }}
-              >
-                Start New Day
-              </Button>
-            ) : (
-              <Button
-                onClick={handleEndDayClick}
-                variant="contained"
-                color="error"
-                startIcon={<Stop />}
-                size="large"
-                fullWidth
-                sx={{
-                  minHeight: { xs: 48, sm: 36 },
-                  fontSize: { xs: "1rem", sm: "0.875rem" },
-                  width: { xs: "100%", sm: "auto" },
-                }}
-              >
-                End Day
-              </Button>
-            )
-          }
-        />
-
-        {/* Work Time stats cards display */}
-        {dayState.entries.length > 0 && (
-          <CardContent sx={{ pt: 0 }}>
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-              {/* Total Time Worked Card */}
-              <Alert
-                severity="info"
-                icon={<AccessTime />}
-                sx={{
-                  backgroundColor: "primary.light",
-                  color: "primary.contrastText",
-                  "& .MuiAlert-icon": {
-                    color: "primary.contrastText",
-                  },
-                }}
-              >
-                <Box
-                  sx={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                  }}
-                >
-                  <Typography variant="h6" sx={{ fontWeight: "bold" }}>
-                    Time Clocked In: {getTotalWorkTime()}
-                  </Typography>
-                </Box>
-              </Alert>
-
-              {/* Total Break Time Card */}
-              <Alert
-                severity="warning"
-                icon={<Coffee />}
-                sx={{
-                  backgroundColor: "warning.light",
-                  color: "warning.contrastText",
-                  "& .MuiAlert-icon": {
-                    color: "warning.contrastText",
-                  },
-                }}
-              >
-                <Box
-                  sx={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                  }}
-                >
-                  <Typography variant="h6" sx={{ fontWeight: "bold" }}>
-                    Time Clocked Out: {getTotalBreakTimeInTrackingPeriod()}
-                  </Typography>
-                </Box>
-              </Alert>
-
-              {/* Must Clock Out By Card */}
-              {(() => {
-                // Compute derived UI state once for the alert
-                const hasSchedule = getTargetHoursForTrackingPeriod() > 0;
-                const remainingMinutes = getRemainingMinutesInPayPeriod();
-                const overtime = hasSchedule && remainingMinutes <= 0;
-                const approaching =
-                  hasSchedule && remainingMinutes > 0 && remainingMinutes <= 60;
-                const severity = !hasSchedule
-                  ? "info"
-                  : overtime
-                  ? "error"
-                  : approaching
-                  ? "warning"
-                  : "success";
-                const bgColor = !hasSchedule
-                  ? "info.light"
-                  : overtime
-                  ? "error.light"
-                  : approaching
-                  ? "warning.light"
-                  : "success.light";
-                const textColor = !hasSchedule
-                  ? "info.contrastText"
-                  : overtime
-                  ? "error.contrastText"
-                  : approaching
-                  ? "warning.contrastText"
-                  : "success.contrastText";
-                const border =
-                  !hasSchedule || (!approaching && !overtime)
-                    ? "none"
-                    : "3px solid";
-                const borderColor = !hasSchedule
-                  ? "transparent"
-                  : overtime
-                  ? "error.main"
-                  : "warning.main";
-
-                return (
-                  <Alert
-                    severity={
-                      severity as "info" | "error" | "warning" | "success"
-                    }
-                    icon={<Schedule />}
-                    sx={{
-                      backgroundColor: bgColor,
-                      color: textColor,
-                      "& .MuiAlert-icon": {
-                        color: textColor,
-                      },
-                      border,
-                      borderColor,
-                      fontSize: { xs: "1rem", sm: "1.125rem" },
-                      fontWeight: "bold",
-                    }}
-                  >
-                    <Box
-                      sx={{
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: 1,
-                      }}
-                    >
-                      <Typography variant="h6" sx={{ fontWeight: "bold" }}>
-                        Must Clock Out By: {getClockOutTime()}
-                      </Typography>
-                      {approaching && (
-                        <Typography
-                          variant="body2"
-                          sx={{
-                            opacity: 0.9,
-                            fontSize: { xs: "0.75rem", sm: "0.875rem" },
-                          }}
-                        >
-                          Approaching limit: ≤ 1 hour remaining to 9h
-                        </Typography>
-                      )}
-                      {overtime && (
-                        <Typography
-                          variant="body2"
-                          sx={{
-                            opacity: 0.9,
-                            fontSize: { xs: "0.75rem", sm: "0.875rem" },
-                          }}
-                        >
-                          Overtime: over target for this pay period
-                        </Typography>
-                      )}
-                      <Typography
-                        variant="body2"
-                        sx={{
-                          opacity: 0.9,
-                          fontSize: { xs: "0.75rem", sm: "0.875rem" },
-                        }}
-                      >
-                        <strong>Current Pay Period:</strong>{" "}
-                        {(() => {
-                          const start = getTrackingPeriodStart();
-                          const end = getTrackingPeriodEnd();
-                          return `${start.toLocaleDateString("en-US", {
-                            month: "short",
-                            day: "numeric",
-                          })} 12pm - ${end.toLocaleDateString("en-US", {
-                            month: "short",
-                            day: "numeric",
-                          })} 11:59am`;
-                        })()}
-                        {/* <br />
-                        <strong>Maximum Worked Time:</strong>{" "}
-                        {getTargetHoursForTrackingPeriod()}h 0m */}
-                        <br />
-                        <strong>Current Time Worked:</strong>{" "}
-                        {formatDuration(calculateWorkTimeInTrackingPeriod())}
-                      </Typography>
-                    </Box>
-                  </Alert>
-                );
-              })()}
-            </Box>
-          </CardContent>
-        )}
-      </Card>
+      <WorkHoursTrackerHeader
+        dayState={dayState}
+        isActive={dayState.isActive}
+        onStartDayClick={handleStartDayClick}
+        onEndDayClick={handleEndDayClick}
+        formatTrackingPeriodLabel={formatTrackingPeriodLabel}
+        getTotalWorkTime={getTotalWorkTime}
+        getTotalBreakTimeInTrackingPeriod={getTotalBreakTimeInTrackingPeriod}
+        getTargetHoursForTrackingPeriod={getTargetHoursForTrackingPeriod}
+        getRemainingMinutesInPayPeriod={getRemainingMinutesInPayPeriod}
+        getClockOutTime={getClockOutTime}
+        calculateWorkTimeInTrackingPeriod={calculateWorkTimeInTrackingPeriod}
+        formatDuration={formatDuration}
+        TrackingPeriodInfo={TrackingPeriodInfo}
+      />
 
       {/* Time entries list */}
-      {dayState.entries.length > 0 && (
-        <Card>
-          <CardHeader
-            title={
-              <Typography
-                variant="h6"
-                sx={{
-                  fontSize: { xs: "1rem", sm: "1.25rem" },
-                  textAlign: { xs: "center", sm: "left" },
-                }}
-              >
-                Time Entries ({currentDate})
-              </Typography>
-            }
-          />
-          <CardContent sx={{ pt: 0 }}>
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
-              {/* Start Day Bookend Entry - shows previous period hours at start of new day */}
-              {startDayBookendEntry &&
-                (() => {
-                  const s = startDayBookendEntry;
-                  return (
-                    <>
-                      {renderVirtualEntryRow(
-                        s.periodStart,
-                        getCurrentTime() < s.periodEnd
-                          ? getCurrentTime()
-                          : s.periodEnd
-                      )}
-                      <Box
-                        sx={{
-                          mb: 1,
-                          py: 0.5,
-                          px: 1.5,
-                          backgroundColor: "info.dark",
-                          borderRadius: 1,
-                          textAlign: "center",
-                        }}
-                      >
-                        <Typography
-                          variant="caption"
-                          sx={{
-                            color: "info.contrastText",
-                            fontWeight: "medium",
-                          }}
-                        >
-                          Day {getPayPeriodDayNumber(s.periodStart)}:{" "}
-                          {formatDuration(s.totalMinutes)} worked in previous
-                          period (still part of ongoing pay period)
-                        </Typography>
-                      </Box>
-                    </>
-                  );
-                })()}
-
-              {dayState.entries.map((entry, index) => {
-                const isLatestEntry = index === dayState.entries.length - 1;
-                const showClockBackIn =
-                  !dayState.isActive &&
-                  isLatestEntry &&
-                  entry.type === "clock-out";
-                const duration = getDurationForEntry(entry, index);
-                const nextEntry = dayState.entries[index + 1];
-                // Check if the current entry and next entry cross a boundary
-                const boundary = nextEntry
-                  ? getTrackingPeriodBoundary(
-                      entry.timestamp,
-                      nextEntry.timestamp
-                    )
-                  : null;
-                // Calculate hours worked up to the boundary (including partial time from current entry if it spans boundary)
-                const hoursBeforeBoundary = boundary
-                  ? calculateHoursUpToBoundary(
-                      dayState.entries.slice(0, index + 1),
-                      boundary
-                    )
-                  : 0;
-
-                // Check if this entry spans the boundary (clock-in before 12pm, clock-out after 12pm)
-                const entrySpansBoundary =
-                  boundary &&
-                  entry.type === "clock-in" &&
-                  nextEntry &&
-                  nextEntry.type === "clock-out" &&
-                  entry.timestamp < boundary &&
-                  nextEntry.timestamp > boundary;
-
-                // Create bookend entries if entry spans boundary
-                const beforeBoundaryEntry = entrySpansBoundary
-                  ? {
-                      clockIn: entry.timestamp,
-                      clockOut: new Date(boundary.getTime() - 60000), // 11:59am
-                    }
-                  : null;
-                const afterBoundaryEntry = entrySpansBoundary
-                  ? {
-                      clockIn: boundary, // 12:00pm
-                      clockOut: nextEntry.timestamp,
-                    }
-                  : null;
-
-                return (
-                  <React.Fragment key={entry.id}>
-                    {/* Always show the original entry */}
-                    {/* Entry Row */}
-                    <Box
-                      sx={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 1,
-                      }}
-                    >
-                      {/* Menu button - outside the row */}
-                      <IconButton
-                        onClick={(e) => handleMenuOpen(e, entry.id)}
-                        size="small"
-                        sx={{
-                          color: "text.secondary",
-                          "&:hover": {
-                            color: "primary.main",
-                            backgroundColor: "action.hover",
-                          },
-                          flexShrink: 0,
-                        }}
-                        aria-label="Entry options"
-                      >
-                        <MoreVert />
-                      </IconButton>
-
-                      {/* Row content */}
-                      <Box
-                        sx={{
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          flex: 1,
-                          py: { xs: 1, sm: 1.25 },
-                          px: { xs: 1.5, sm: 2 },
-                          border: "1px solid",
-                          borderColor: "divider",
-                          borderRadius: 2,
-                          backgroundColor: "background.paper",
-                          minHeight: 48,
-                          "&:hover": {
-                            backgroundColor: "action.hover",
-                          },
-                        }}
-                      >
-                        {/* Left side - Time and Badge */}
-                        <Box sx={{ flex: 0, minWidth: 120 }}>
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 1,
-                              minHeight: 32,
-                            }}
-                          >
-                            <Typography
-                              variant="h6"
-                              sx={{
-                                fontWeight: "bold",
-                                fontSize: { xs: "1rem", sm: "1.25rem" },
-                                color:
-                                  entry.type === "clock-in"
-                                    ? "success.main"
-                                    : "error.main",
-                                lineHeight: 1,
-                                display: "flex",
-                                alignItems: "center",
-                              }}
-                            >
-                              {formatTime(entry.timestamp)}
-                            </Typography>
-                            <Chip
-                              label={entry.type === "clock-in" ? "IN" : "OUT"}
-                              color={
-                                entry.type === "clock-in" ? "success" : "error"
-                              }
-                              variant="filled"
-                              size="small"
-                              sx={{
-                                fontSize: { xs: "0.7rem", sm: "0.75rem" },
-                                fontWeight: "bold",
-                                height: { xs: 24, sm: 28 },
-                                minWidth: 40,
-                                justifyContent: "center",
-                                alignSelf: "center",
-                                transform: "translateY(-1px)",
-                              }}
-                            />
-                          </Box>
-                        </Box>
-
-                        {/* Center - Duration and Reason */}
-                        <Box
-                          sx={{
-                            display: "flex",
-                            flexDirection: "column",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            flex: 1, // Take up remaining space to center better
-                            maxWidth: 120, // Prevent it from getting too wide
-                            mx: { xs: 1, sm: 1.5 },
-                            minHeight: 48, // Match reduced row height
-                          }}
-                        >
-                          <Box
-                            sx={{
-                              display: "flex",
-                              flexDirection: "column",
-                              alignItems: "center",
-                              textAlign: "center",
-                            }}
-                          >
-                            {duration && (
-                              <Typography
-                                variant="body2"
-                                sx={{
-                                  color: "text.secondary",
-                                  fontSize: { xs: "0.875rem", sm: "1rem" },
-                                  fontWeight: "medium",
-                                }}
-                              >
-                                {duration}
-                              </Typography>
-                            )}
-                          </Box>
-                        </Box>
-
-                        {/* Right side - Action button */}
-                        <Box
-                          sx={{
-                            display: "flex",
-                            justifyContent: "flex-end",
-                            alignItems: "center",
-                            flex: 0,
-                            minWidth: 100, // Fixed width for consistent positioning
-                            minHeight: 48, // Match reduced row height
-                          }}
-                        >
-                          {showClockBackIn ? (
-                            <Button
-                              onClick={() => onStartDay(false)}
-                              variant="contained"
-                              color="success"
-                              startIcon={<PlayArrow />}
-                              size="medium"
-                              sx={{
-                                fontSize: { xs: "0.875rem", sm: "1rem" },
-                                minHeight: { xs: 40, sm: 44 },
-                                minWidth: 100, // Uniform width for all buttons
-                                px: { xs: 2, sm: 3 },
-                              }}
-                            >
-                              Back In
-                            </Button>
-                          ) : (
-                            <Button
-                              onClick={() => handleToggleEntryClick(entry.id)}
-                              variant="outlined"
-                              color={
-                                entry.type === "clock-in" ? "error" : "success"
-                              }
-                              size="medium"
-                              disabled={!isLatestEntry}
-                              sx={{
-                                fontSize: { xs: "0.875rem", sm: "1rem" },
-                                minHeight: { xs: 40, sm: 44 },
-                                minWidth: 100, // Uniform width for all buttons
-                                px: { xs: 2, sm: 3 },
-                              }}
-                            >
-                              {entry.type === "clock-in"
-                                ? "Clock Out"
-                                : "Clock In"}
-                            </Button>
-                          )}
-                        </Box>
-                      </Box>
-                    </Box>
-
-                    {/* If this entry spans boundary, insert bookend entries after it */}
-                    {entrySpansBoundary &&
-                      beforeBoundaryEntry &&
-                      afterBoundaryEntry &&
-                      boundary && (
-                        <>
-                          {/* Before boundary bookend entry (shows forced clock-out at 11:59am) */}
-                          {renderVirtualEntryRow(
-                            beforeBoundaryEntry.clockIn,
-                            beforeBoundaryEntry.clockOut
-                          )}
-
-                          {/* Tracking Period Boundary Separator */}
-                          {renderBoundarySeparator(
-                            boundary,
-                            hoursBeforeBoundary +
-                              (startDayBookendEntry?.totalMinutes || 0)
-                          )}
-
-                          {/* After boundary bookend entry (shows forced clock-in at 12:00pm) */}
-                          {renderVirtualEntryRow(
-                            afterBoundaryEntry.clockIn,
-                            afterBoundaryEntry.clockOut
-                          )}
-                        </>
-                      )}
-
-                    {/* Tracking Period Boundary Separator - shown after entry that crosses boundary (for non-spanning boundaries) */}
-                    {boundary && !entrySpansBoundary && (
-                      <>
-                        {entry.type === "clock-out" &&
-                          nextEntry &&
-                          nextEntry.type === "clock-in" && (
-                            <>
-                              {renderVirtualBreakRow(
-                                entry.timestamp,
-                                new Date(boundary.getTime() - 60000)
-                              )}
-                            </>
-                          )}
-                        {renderBoundarySeparator(
-                          boundary,
-                          hoursBeforeBoundary +
-                            (startDayBookendEntry?.totalMinutes || 0)
-                        )}
-                        {entry.type === "clock-out" &&
-                          nextEntry &&
-                          nextEntry.type === "clock-in" && (
-                            <>
-                              {renderVirtualBreakRow(
-                                boundary,
-                                nextEntry.timestamp
-                              )}
-                            </>
-                          )}
-                      </>
-                    )}
-                  </React.Fragment>
-                );
-              })}
-
-              {/* Virtual boundary when the user crossed into a new pay period while clocked out (no next entry yet) */}
-              {!dayState.isActive &&
-                dayState.entries.length > 0 &&
-                (() => {
-                  const last = dayState.entries[dayState.entries.length - 1];
-                  const now = getCurrentTime();
-                  const boundary = getTrackingPeriodBoundary(
-                    last.timestamp,
-                    now
-                  );
-                  if (!boundary) return null;
-                  const hoursBeforeBoundary = calculateHoursUpToBoundary(
-                    dayState.entries,
-                    boundary
-                  );
-                  return (
-                    <>
-                      {/* Break before boundary */}
-                      {last.type === "clock-out" &&
-                        renderVirtualBreakRow(
-                          last.timestamp,
-                          new Date(boundary.getTime() - 60000)
-                        )}
-                      {renderBoundarySeparator(
-                        boundary,
-                        hoursBeforeBoundary +
-                          (startDayBookendEntry?.totalMinutes || 0)
-                      )}
-                      {/* If still clocked out, show break from boundary to now */}
-                      {last.type === "clock-out" &&
-                        renderVirtualBreakRow(boundary, now)}
-                    </>
-                  );
-                })()}
-
-              {/* End Day Summary - shows ongoing pay period time when day is ended */}
-              {endDaySummary &&
-                !dayState.isActive &&
-                (() => {
-                  const s = endDaySummary;
-                  return (
-                    <>
-                      <Box
-                        sx={{
-                          my: 2,
-                          py: 1,
-                          px: 2,
-                          borderTop: "2px solid",
-                          borderBottom: "2px solid",
-                          borderColor: "divider",
-                        }}
-                      >
-                        <Typography
-                          variant="caption"
-                          sx={{
-                            color: "text.secondary",
-                            textAlign: "center",
-                            display: "block",
-                          }}
-                        >
-                          Day Ended - Ongoing Pay Period Summary
-                        </Typography>
-                      </Box>
-                      {renderVirtualEntryRow(s.periodStart, s.periodEnd)}
-                      <Box
-                        sx={{
-                          mt: 1,
-                          mb: 2,
-                          py: 1,
-                          px: 2,
-                          backgroundColor: "info.dark",
-                          borderRadius: 1,
-                          textAlign: "center",
-                        }}
-                      >
-                        <Typography
-                          variant="body2"
-                          sx={{
-                            color: "info.contrastText",
-                            fontWeight: "medium",
-                          }}
-                        >
-                          Total Time Worked in Ongoing Pay Period:{" "}
-                          <strong>{formatDuration(s.totalMinutes)}</strong>
-                        </Typography>
-                        <Typography
-                          variant="caption"
-                          sx={{
-                            color: "info.contrastText",
-                            opacity: 0.9,
-                            display: "block",
-                            mt: 0.5,
-                          }}
-                        >
-                          This time will carry over into the next day's pay
-                          period (ends at 11:59am)
-                        </Typography>
-                      </Box>
-                    </>
-                  );
-                })()}
-            </Box>
-          </CardContent>
-        </Card>
-      )}
+      <TimeEntriesTable
+        dayState={dayState}
+        currentDate={currentDate}
+        startDayBookendEntry={startDayBookendEntry}
+        endDaySummary={endDaySummary}
+        onStartDay={onStartDay}
+        onToggleEntry={handleToggleEntryClick}
+        handleMenuOpen={handleMenuOpen}
+        formatTime={formatTime}
+        formatDuration={formatDuration}
+        getDurationForEntry={getDurationForEntry}
+        getTrackingPeriodBoundary={getTrackingPeriodBoundary}
+        getPayPeriodDayNumber={getPayPeriodDayNumber}
+        getCurrentTime={getCurrentTime}
+        renderVirtualEntryRow={renderVirtualEntryRow}
+        renderVirtualBreakRow={renderVirtualBreakRow}
+        renderBoundarySeparator={renderBoundarySeparator}
+      />
 
       {/* Entry Menu */}
       <Menu
