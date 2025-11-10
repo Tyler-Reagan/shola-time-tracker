@@ -13,8 +13,6 @@ import {
   DialogContent,
   DialogContentText,
   DialogActions,
-  FormControlLabel,
-  Checkbox,
   TextField,
   IconButton,
   Menu,
@@ -33,6 +31,7 @@ import {
   Delete,
 } from "@mui/icons-material";
 import { DayState } from "../types";
+import { getCurrentTime } from "../utils/timeSimulator";
 
 interface WorkHoursTrackerProps {
   dayState: DayState;
@@ -43,12 +42,6 @@ interface WorkHoursTrackerProps {
   onDeleteEntry: (entryId: string) => void;
 }
 
-const CLOCK_OUT_REASONS = [
-  { emoji: "🚗", label: "Commuting", value: "commuting" },
-  { emoji: "🍜", label: "Lunch", value: "lunch" },
-  { emoji: "📝", label: "Miscellaneous", value: "misc" },
-];
-
 export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
   dayState,
   onStartDay,
@@ -58,11 +51,6 @@ export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
   onDeleteEntry,
 }) => {
   const [showConfirmDialog, setShowConfirmDialog] = React.useState(false);
-  const [showReasonDialog, setShowReasonDialog] = React.useState(false);
-  const [disableReasonDialog, setDisableReasonDialog] = React.useState(false);
-  const [pendingEntryId, setPendingEntryId] = React.useState<string | null>(
-    null
-  );
   const [showEditDialog, setShowEditDialog] = React.useState(false);
   const [editingEntryId, setEditingEntryId] = React.useState<string | null>(
     null
@@ -76,6 +64,13 @@ export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
   const [deletingEntryId, setDeletingEntryId] = React.useState<string | null>(
     null
   );
+  const [showPreviousPeriodCard, setShowPreviousPeriodCard] =
+    React.useState(false);
+  const [previousPeriodHours, setPreviousPeriodHours] = React.useState<{
+    hours: number;
+    periodStart: Date;
+    periodEnd: Date;
+  } | null>(null);
   // Shared time formatting utilities
   const formatTime = (date: Date): string => {
     return date.toLocaleTimeString("en-US", {
@@ -100,6 +95,140 @@ export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
     return `${hours}h ${remainingMinutes}m`;
   };
 
+  // Tracking period constants and utilities
+  const TRACKING_PERIOD_START_HOUR = 12; // 12pm
+  const DAILY_HOUR_TARGETS: Record<number, number> = {
+    1: 9, // Monday
+    2: 9, // Tuesday
+    3: 9, // Wednesday
+    4: 9, // Thursday
+    5: 4, // Friday
+  };
+
+  /**
+   * Gets the start of the current tracking period (12pm of previous day)
+   */
+  const getTrackingPeriodStart = (): Date => {
+    const now = getCurrentTime();
+    const trackingStart = new Date(now);
+
+    if (now.getHours() < TRACKING_PERIOD_START_HOUR) {
+      trackingStart.setDate(now.getDate() - 1);
+    }
+
+    trackingStart.setHours(TRACKING_PERIOD_START_HOUR, 0, 0, 0);
+    return trackingStart;
+  };
+
+  /**
+   * Gets the end of the current tracking period (11:59am of current day)
+   */
+  const getTrackingPeriodEnd = (): Date => {
+    const now = getCurrentTime();
+    const trackingEnd = new Date(now);
+
+    if (now.getHours() >= TRACKING_PERIOD_START_HOUR) {
+      trackingEnd.setDate(now.getDate() + 1);
+    }
+
+    trackingEnd.setHours(TRACKING_PERIOD_START_HOUR - 1, 59, 59, 999);
+    return trackingEnd;
+  };
+
+  /**
+   * Calculates hours worked in tracking period up to a specific time
+   * Used to show hours worked before starting a new day
+   */
+  const calculateWorkTimeUpToTime = (
+    entries: typeof dayState.entries,
+    periodStart: Date,
+    periodEnd: Date,
+    upToTime: Date
+  ): number => {
+    let totalMinutes = 0;
+    let clockInTime: Date | null = null;
+
+    for (const entry of entries) {
+      // Only process entries up to the specified time
+      if (entry.timestamp > upToTime) {
+        // If we have an active clock-in, count up to upToTime
+        if (clockInTime) {
+          const effectiveClockIn =
+            clockInTime < periodStart ? periodStart : clockInTime;
+          const effectiveClockOut = upToTime > periodEnd ? periodEnd : upToTime;
+          if (effectiveClockOut > effectiveClockIn) {
+            const diffMs =
+              effectiveClockOut.getTime() - effectiveClockIn.getTime();
+            totalMinutes += Math.floor(diffMs / (1000 * 60));
+          }
+          clockInTime = null;
+        }
+        break;
+      }
+
+      if (entry.type === "clock-in") {
+        clockInTime = entry.timestamp;
+      } else if (entry.type === "clock-out" && clockInTime) {
+        // Calculate the effective clock-in time (use period start if before period)
+        const effectiveClockIn =
+          clockInTime < periodStart ? periodStart : clockInTime;
+        // Calculate the effective clock-out time (use period end if after period, or upToTime if after that)
+        let effectiveClockOut = entry.timestamp;
+        if (effectiveClockOut > periodEnd) {
+          effectiveClockOut = periodEnd;
+        }
+        if (effectiveClockOut > upToTime) {
+          effectiveClockOut = upToTime;
+        }
+
+        // Only count if clock-out is after clock-in
+        if (effectiveClockOut > effectiveClockIn) {
+          const diffMs =
+            effectiveClockOut.getTime() - effectiveClockIn.getTime();
+          totalMinutes += Math.floor(diffMs / (1000 * 60));
+        }
+        clockInTime = null;
+      }
+    }
+
+    // If there's still an active clock-in at the end, count up to upToTime
+    if (clockInTime) {
+      const effectiveClockIn =
+        clockInTime < periodStart ? periodStart : clockInTime;
+      const effectiveClockOut = upToTime > periodEnd ? periodEnd : upToTime;
+      if (effectiveClockOut > effectiveClockIn) {
+        const diffMs = effectiveClockOut.getTime() - effectiveClockIn.getTime();
+        totalMinutes += Math.floor(diffMs / (1000 * 60));
+      }
+    }
+
+    return totalMinutes;
+  };
+
+  /**
+   * Gets target hours for the day that ends the tracking period
+   */
+  const getTargetHoursForTrackingPeriod = (): number => {
+    const periodEnd = getTrackingPeriodEnd();
+    const dayOfWeek = periodEnd.getDay();
+    return DAILY_HOUR_TARGETS[dayOfWeek] || 0;
+  };
+
+  /**
+   * Calculates current work time in tracking period
+   */
+  const calculateWorkTimeInTrackingPeriod = (): number => {
+    const periodStart = getTrackingPeriodStart();
+    const periodEnd = getTrackingPeriodEnd();
+    const now = getCurrentTime();
+    return calculateWorkTimeUpToTime(
+      dayState.entries,
+      periodStart,
+      periodEnd,
+      now
+    );
+  };
+
   const getDurationForEntry = (entry: any, index: number): string => {
     // Latest row never has duration - its session hasn't ended yet
     const isLatestRow = index === dayState.entries.length - 1;
@@ -120,17 +249,57 @@ export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
 
   const currentDate = dayState.dayDate
     ? formatDate(dayState.dayDate)
-    : formatDate(new Date());
+    : formatDate(getCurrentTime());
 
   const handleStartDayClick = () => {
     if (dayState.entries.length > 0) {
       setShowConfirmDialog(true);
     } else {
+      // Calculate hours worked in current tracking period before starting
+      const now = getCurrentTime();
+      const periodStart = getTrackingPeriodStart();
+      const periodEnd = getTrackingPeriodEnd();
+      const hoursWorked = calculateWorkTimeUpToTime(
+        dayState.entries,
+        periodStart,
+        periodEnd,
+        now
+      );
+
+      if (hoursWorked > 0) {
+        setPreviousPeriodHours({
+          hours: hoursWorked,
+          periodStart,
+          periodEnd,
+        });
+        setShowPreviousPeriodCard(true);
+      }
+
       onStartDay(false);
     }
   };
 
   const handleConfirmStartNewDay = () => {
+    // Calculate hours worked in current tracking period before starting
+    const now = getCurrentTime();
+    const periodStart = getTrackingPeriodStart();
+    const periodEnd = getTrackingPeriodEnd();
+    const hoursWorked = calculateWorkTimeUpToTime(
+      dayState.entries,
+      periodStart,
+      periodEnd,
+      now
+    );
+
+    if (hoursWorked > 0) {
+      setPreviousPeriodHours({
+        hours: hoursWorked,
+        periodStart,
+        periodEnd,
+      });
+      setShowPreviousPeriodCard(true);
+    }
+
     onStartDay(true);
     setShowConfirmDialog(false);
   };
@@ -140,28 +309,7 @@ export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
   };
 
   const handleToggleEntryClick = (entryId: string) => {
-    const entry = dayState.entries.find((e) => e.id === entryId);
-    if (entry && entry.type === "clock-in" && !disableReasonDialog) {
-      // Show reason dialog for clock-out
-      setPendingEntryId(entryId);
-      setShowReasonDialog(true);
-    } else {
-      // Direct toggle without reason dialog
-      onToggleEntry(entryId);
-    }
-  };
-
-  const handleReasonSelect = (reason: string) => {
-    if (pendingEntryId) {
-      onToggleEntry(pendingEntryId, reason);
-    }
-    setShowReasonDialog(false);
-    setPendingEntryId(null);
-  };
-
-  const handleCancelReasonDialog = () => {
-    setShowReasonDialog(false);
-    setPendingEntryId(null);
+    onToggleEntry(entryId);
   };
 
   const handleEditEntryClick = (entryId: string) => {
@@ -237,24 +385,7 @@ export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
 
   // Shared work time calculation logic
   const calculateWorkTime = (): number => {
-    if (!dayState.startTime || dayState.entries.length === 0) {
-      return 0;
-    }
-
-    let totalMinutes = 0;
-    let clockInTime: Date | null = null;
-
-    for (const entry of dayState.entries) {
-      if (entry.type === "clock-in") {
-        clockInTime = entry.timestamp;
-      } else if (entry.type === "clock-out" && clockInTime) {
-        const diffMs = entry.timestamp.getTime() - clockInTime.getTime();
-        totalMinutes += Math.floor(diffMs / (1000 * 60));
-        clockInTime = null;
-      }
-    }
-
-    return totalMinutes;
+    return calculateWorkTimeInTrackingPeriod();
   };
 
   const calculateBreakTime = (): number => {
@@ -286,30 +417,29 @@ export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
     return formatDuration(calculateBreakTime());
   };
 
-  const getClockOutTime = (): string => {
-    if (!dayState.startTime || dayState.entries.length === 0) {
-      return "N/A";
+  /**
+   * Gets the absolute latest time to clock out to avoid overtime
+   */
+  const getLatestClockOutTime = (): {
+    time: Date;
+    isOvertime: boolean;
+  } | null => {
+    const targetHours = getTargetHoursForTrackingPeriod();
+    if (targetHours === 0) {
+      return null; // No work expected on this day
     }
 
-    const MAX_WORK_HOURS = 8;
-    const MAX_WORK_MINUTES = MAX_WORK_HOURS * 60;
-    const totalWorkMinutes = calculateWorkTime();
-    const remainingMinutes = MAX_WORK_MINUTES - totalWorkMinutes;
+    const targetMinutes = targetHours * 60;
+    const workedMinutes = calculateWorkTimeInTrackingPeriod();
+    const remainingMinutes = targetMinutes - workedMinutes;
 
-    if (remainingMinutes <= 0) {
-      return "Completed";
-    }
-
-    // Find the last active clock-in (most recent clock-in without a clock-out after it)
+    // Find the last active clock-in
     let activeClockInTime: Date | null = null;
-
     for (let i = dayState.entries.length - 1; i >= 0; i--) {
       if (dayState.entries[i].type === "clock-in") {
-        // Check if there's a clock-out after this clock-in
         const hasLaterClockOut = dayState.entries
           .slice(i + 1)
           .some((e) => e.type === "clock-out");
-
         if (!hasLaterClockOut) {
           activeClockInTime = dayState.entries[i].timestamp;
           break;
@@ -317,40 +447,67 @@ export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
       }
     }
 
-    if (activeClockInTime) {
-      // They're actively working - calculate when they must clock out
-      const clockOutTime = new Date(
-        activeClockInTime.getTime() + remainingMinutes * 60 * 1000
-      );
-
-      const now = new Date();
-      if (clockOutTime.getTime() <= now.getTime()) {
-        return "Should clock out now";
-      }
-
-      return clockOutTime.toLocaleTimeString("en-US", {
-        hour: "numeric",
-        minute: "2-digit",
-        hour12: true,
-      });
-    } else {
-      // They're clocked out (on break) - calculate when they need to finish their 8 hours
-      // This is the day start time + 8 hours
-      const finishTime = new Date(
-        dayState.startTime.getTime() + MAX_WORK_MINUTES * 60 * 1000
-      );
-
-      const now = new Date();
-      if (finishTime.getTime() <= now.getTime()) {
-        return "Should finish now";
-      }
-
-      return finishTime.toLocaleTimeString("en-US", {
-        hour: "numeric",
-        minute: "2-digit",
-        hour12: true,
-      });
+    if (!activeClockInTime) {
+      return null; // Not currently clocked in
     }
+
+    const periodStart = getTrackingPeriodStart();
+    const periodEnd = getTrackingPeriodEnd();
+
+    // Adjust clock-in time if it's before the period start
+    const effectiveClockIn =
+      activeClockInTime < periodStart ? periodStart : activeClockInTime;
+
+    // Calculate when they need to clock out
+    const latestClockOut = new Date(
+      effectiveClockIn.getTime() + remainingMinutes * 60 * 1000
+    );
+
+    // Don't allow clock-out beyond the tracking period end
+    const finalClockOut =
+      latestClockOut > periodEnd ? periodEnd : latestClockOut;
+
+    const now = getCurrentTime();
+    const isOvertime = finalClockOut.getTime() <= now.getTime();
+
+    return {
+      time: finalClockOut,
+      isOvertime,
+    };
+  };
+
+  const getClockOutTime = (): string => {
+    const targetHours = getTargetHoursForTrackingPeriod();
+    if (targetHours === 0) {
+      return "No work scheduled";
+    }
+
+    const latestClockOut = getLatestClockOutTime();
+    if (!latestClockOut) {
+      return "Not clocked in";
+    }
+
+    if (latestClockOut.isOvertime) {
+      return "⚠️ OVERTIME - Clock out immediately!";
+    }
+
+    const now = getCurrentTime();
+    const timeUntilDeadline = latestClockOut.time.getTime() - now.getTime();
+    const minutesUntilDeadline = Math.floor(timeUntilDeadline / (1000 * 60));
+
+    if (minutesUntilDeadline <= 15) {
+      return `⚠️ ${latestClockOut.time.toLocaleTimeString("en-US", {
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+      })} - Clock out soon!`;
+    }
+
+    return latestClockOut.time.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
   };
 
   return (
@@ -369,6 +526,105 @@ export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
       >
         {currentDate}
       </Typography>
+
+      {/* Previous Period Hours Card - shows hours worked before current clock-in */}
+      {showPreviousPeriodCard && previousPeriodHours && (
+        <Card
+          sx={{
+            border: "2px solid",
+            borderColor: "warning.main",
+            backgroundColor: "warning.light",
+          }}
+        >
+          <CardContent>
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 1.5,
+              }}
+            >
+              <Typography
+                variant="h6"
+                sx={{
+                  fontWeight: "bold",
+                  color: "warning.contrastText",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1,
+                }}
+              >
+                <AccessTime />
+                Hours Already Worked in This Tracking Period
+              </Typography>
+              <Typography
+                variant="h5"
+                sx={{
+                  fontWeight: "bold",
+                  color: "warning.contrastText",
+                }}
+              >
+                {formatDuration(previousPeriodHours.hours)}
+              </Typography>
+              <Typography
+                variant="body2"
+                sx={{
+                  color: "warning.contrastText",
+                  opacity: 0.9,
+                }}
+              >
+                Tracking Period:{" "}
+                {previousPeriodHours.periodStart.toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                })}{" "}
+                12pm -{" "}
+                {previousPeriodHours.periodEnd.toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                })}{" "}
+                11:59am
+              </Typography>
+              <Typography
+                variant="body2"
+                sx={{
+                  color: "warning.contrastText",
+                  opacity: 0.9,
+                }}
+              >
+                Target: {getTargetHoursForTrackingPeriod()}h | Remaining:{" "}
+                {formatDuration(
+                  Math.max(
+                    0,
+                    getTargetHoursForTrackingPeriod() * 60 -
+                      previousPeriodHours.hours
+                  )
+                )}
+              </Typography>
+              <Button
+                onClick={() => {
+                  setShowPreviousPeriodCard(false);
+                  setPreviousPeriodHours(null);
+                }}
+                variant="outlined"
+                size="small"
+                sx={{
+                  mt: 1,
+                  alignSelf: "flex-start",
+                  borderColor: "warning.contrastText",
+                  color: "warning.contrastText",
+                  "&:hover": {
+                    borderColor: "warning.contrastText",
+                    backgroundColor: "rgba(255, 255, 255, 0.1)",
+                  },
+                }}
+              >
+                Dismiss
+              </Button>
+            </Box>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Header Card */}
       <Card>
@@ -487,27 +743,123 @@ export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
                 </Box>
               </Alert>
 
-              {/* Clock Out Time Card */}
+              {/* Clock Out Time Card - Made more prominent */}
               <Alert
-                severity="success"
+                severity={(() => {
+                  const latestClockOut = getLatestClockOutTime();
+                  if (!latestClockOut) return "info";
+                  if (latestClockOut.isOvertime) return "error";
+                  const now = getCurrentTime();
+                  const minutesUntil = Math.floor(
+                    (latestClockOut.time.getTime() - now.getTime()) /
+                      (1000 * 60)
+                  );
+                  return minutesUntil <= 15 ? "warning" : "success";
+                })()}
                 icon={<Schedule />}
                 sx={{
-                  backgroundColor: "success.light",
-                  color: "success.contrastText",
+                  backgroundColor: (() => {
+                    const latestClockOut = getLatestClockOutTime();
+                    if (!latestClockOut) return "info.light";
+                    if (latestClockOut.isOvertime) return "error.light";
+                    const now = getCurrentTime();
+                    const minutesUntil = Math.floor(
+                      (latestClockOut.time.getTime() - now.getTime()) /
+                        (1000 * 60)
+                    );
+                    return minutesUntil <= 15
+                      ? "warning.light"
+                      : "success.light";
+                  })(),
+                  color: (() => {
+                    const latestClockOut = getLatestClockOutTime();
+                    if (!latestClockOut) return "info.contrastText";
+                    if (latestClockOut.isOvertime) return "error.contrastText";
+                    const now = getCurrentTime();
+                    const minutesUntil = Math.floor(
+                      (latestClockOut.time.getTime() - now.getTime()) /
+                        (1000 * 60)
+                    );
+                    return minutesUntil <= 15
+                      ? "warning.contrastText"
+                      : "success.contrastText";
+                  })(),
                   "& .MuiAlert-icon": {
-                    color: "success.contrastText",
+                    color: (() => {
+                      const latestClockOut = getLatestClockOutTime();
+                      if (!latestClockOut) return "info.contrastText";
+                      if (latestClockOut.isOvertime)
+                        return "error.contrastText";
+                      const now = getCurrentTime();
+                      const minutesUntil = Math.floor(
+                        (latestClockOut.time.getTime() - now.getTime()) /
+                          (1000 * 60)
+                      );
+                      return minutesUntil <= 15
+                        ? "warning.contrastText"
+                        : "success.contrastText";
+                    })(),
                   },
+                  border: (() => {
+                    const latestClockOut = getLatestClockOutTime();
+                    if (!latestClockOut) return "none";
+                    if (latestClockOut.isOvertime) return "3px solid";
+                    const now = getCurrentTime();
+                    const minutesUntil = Math.floor(
+                      (latestClockOut.time.getTime() - now.getTime()) /
+                        (1000 * 60)
+                    );
+                    return minutesUntil <= 15 ? "3px solid" : "none";
+                  })(),
+                  borderColor: (() => {
+                    const latestClockOut = getLatestClockOutTime();
+                    if (!latestClockOut) return "transparent";
+                    if (latestClockOut.isOvertime) return "error.main";
+                    return "warning.main";
+                  })(),
+                  fontSize: { xs: "1rem", sm: "1.125rem" },
+                  fontWeight: "bold",
                 }}
               >
                 <Box
                   sx={{
                     display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
+                    flexDirection: "column",
+                    gap: 1,
                   }}
                 >
                   <Typography variant="h6" sx={{ fontWeight: "bold" }}>
                     Must Clock Out By: {getClockOutTime()}
+                  </Typography>
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      opacity: 0.9,
+                      fontSize: { xs: "0.75rem", sm: "0.875rem" },
+                    }}
+                  >
+                    Tracking Period:{" "}
+                    {(() => {
+                      const start = getTrackingPeriodStart();
+                      const end = getTrackingPeriodEnd();
+                      return `${start.toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                      })} 12pm - ${end.toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                      })} 11:59am`;
+                    })()}
+                  </Typography>
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      opacity: 0.9,
+                      fontSize: { xs: "0.75rem", sm: "0.875rem" },
+                    }}
+                  >
+                    Target: {getTargetHoursForTrackingPeriod()}h | Worked:{" "}
+                    {formatDuration(calculateWorkTimeInTrackingPeriod())}
                   </Typography>
                 </Box>
               </Alert>
@@ -664,38 +1016,6 @@ export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
                               }}
                             >
                               {duration}
-                            </Typography>
-                          )}
-                          {/* Reason indicator for clock-out entries */}
-                          {entry.type === "clock-out" &&
-                            entry.reason &&
-                            (() => {
-                              const reason = CLOCK_OUT_REASONS.find(
-                                (r) => r.value === entry.reason
-                              );
-                              return reason ? (
-                                <Typography
-                                  variant="caption"
-                                  sx={{
-                                    color: "text.secondary",
-                                    fontSize: { xs: "0.7rem", sm: "0.75rem" },
-                                    mt: 0.25,
-                                  }}
-                                >
-                                  {reason.emoji} {reason.label}
-                                </Typography>
-                              ) : null;
-                            })()}
-                          {entry.type === "clock-out" && !entry.reason && (
-                            <Typography
-                              variant="caption"
-                              sx={{
-                                color: "text.secondary",
-                                fontSize: { xs: "0.7rem", sm: "0.75rem" },
-                                mt: 0.25,
-                              }}
-                            >
-                              🌙 End of day
                             </Typography>
                           )}
                         </Box>
@@ -890,144 +1210,6 @@ export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
           </Button>
         </DialogActions>
       </Dialog>
-
-      {/* Clock-out Reason Dialog */}
-      <Dialog
-        open={showReasonDialog}
-        onClose={handleCancelReasonDialog}
-        aria-labelledby="reason-dialog-title"
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle
-          id="reason-dialog-title"
-          sx={{
-            fontSize: { xs: "1.125rem", sm: "1.25rem" },
-            textAlign: { xs: "center", sm: "left" },
-          }}
-        >
-          Why are you clocking out?
-        </DialogTitle>
-        <DialogContent>
-          <DialogContentText
-            sx={{
-              mb: 3,
-              fontSize: { xs: "0.875rem", sm: "1rem" },
-              textAlign: { xs: "center", sm: "left" },
-            }}
-          >
-            Please select a reason for clocking out:
-          </DialogContentText>
-          <Box
-            sx={{
-              display: "flex",
-              flexDirection: { xs: "column", sm: "row" },
-              gap: 2,
-              justifyContent: "center",
-            }}
-          >
-            {CLOCK_OUT_REASONS.map((reason) => (
-              <Button
-                key={reason.value}
-                fullWidth
-                variant="outlined"
-                onClick={() => handleReasonSelect(reason.value)}
-                sx={{
-                  height: { xs: 70, sm: 80 },
-                  display: "flex",
-                  flexDirection: "row",
-                  gap: 1,
-                  border: "2px solid",
-                  borderColor: "primary.main",
-                  minHeight: { xs: 44, sm: 80 },
-                  "&:hover": {
-                    backgroundColor: "primary.light",
-                    borderColor: "primary.dark",
-                  },
-                }}
-              >
-                <Typography
-                  variant="h4"
-                  sx={{ fontSize: { xs: "2rem", sm: "2.125rem" } }}
-                >
-                  {reason.emoji}
-                </Typography>
-                <Typography
-                  variant="h6"
-                  sx={{
-                    fontWeight: "medium",
-                    fontSize: { xs: "1.25rem", sm: "1.5rem" },
-                  }}
-                >
-                  {reason.label}
-                </Typography>
-              </Button>
-            ))}
-          </Box>
-        </DialogContent>
-        <DialogActions
-          sx={{
-            px: { xs: 2, sm: 3 },
-            pb: { xs: 2, sm: 3 },
-          }}
-        >
-          <Button
-            onClick={handleCancelReasonDialog}
-            color="primary"
-            fullWidth
-            sx={{
-              minHeight: { xs: 44, sm: 36 },
-              width: { xs: "100%", sm: "auto" },
-            }}
-          >
-            Cancel
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Clock-out reason toggle */}
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: { xs: "center", sm: "flex-start" },
-          py: 1,
-          px: 2,
-          border: "1px solid",
-          borderColor: "divider",
-          borderRadius: 1,
-          backgroundColor: "background.paper",
-          maxWidth: "fit-content",
-          mx: { xs: "auto", sm: 0 },
-        }}
-      >
-        <FormControlLabel
-          control={
-            <Checkbox
-              checked={disableReasonDialog}
-              onChange={(e) => setDisableReasonDialog(e.target.checked)}
-              color="primary"
-              size="small"
-              sx={{
-                "& .MuiSvgIcon-root": {
-                  fontSize: { xs: "1.25rem", sm: "1.5rem" },
-                },
-              }}
-            />
-          }
-          label={
-            <Typography
-              variant="body2"
-              sx={{
-                fontSize: { xs: "0.75rem", sm: "0.875rem" },
-                textAlign: { xs: "center", sm: "left" },
-              }}
-            >
-              Disable clock-out reason dialog
-            </Typography>
-          }
-          sx={{ m: 0 }}
-        />
-      </Box>
 
       {/* Edit Entry Dialog */}
       <Dialog

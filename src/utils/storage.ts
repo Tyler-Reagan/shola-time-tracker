@@ -1,4 +1,5 @@
 import { DayState } from "../types";
+import { getCurrentTime } from "./timeSimulator";
 
 const STORAGE_KEY = "shola-time-tracker-day-state";
 
@@ -50,7 +51,7 @@ export function deserializeDayState(serialized: string): DayState | null {
 
 // Check if a date is today (same calendar day)
 export function isToday(date: Date): boolean {
-  const today = new Date();
+  const today = getCurrentTime();
   return (
     date.getFullYear() === today.getFullYear() &&
     date.getMonth() === today.getMonth() &&

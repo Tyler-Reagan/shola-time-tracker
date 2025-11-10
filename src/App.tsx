@@ -9,8 +9,10 @@ import {
 import { WorkHoursTracker } from "./components/WorkHoursTracker";
 import { DiscountCalculator } from "../src/components/DiscountCalculator";
 import { CustomTabs } from "../src/components/Tabs";
+import { TimeSimulatorPanel } from "./components/TimeSimulatorPanel";
 import { TimeEntry, DayState } from "./types";
 import { loadDayState, saveDayState, isStorageAvailable } from "./utils/storage";
+import { getCurrentTime } from "./utils/timeSimulator";
 
 // Create a dark theme for the app
 const darkTheme = createTheme({
@@ -257,7 +259,7 @@ function App() {
   }, [dayState]);
 
   const handleStartDay = (clearExisting = false) => {
-    const now = new Date();
+    const now = getCurrentTime();
     const newEntry: TimeEntry = {
       id: crypto.randomUUID(),
       timestamp: now,
@@ -273,7 +275,7 @@ function App() {
   };
 
   const handleEndDay = () => {
-    const now = new Date();
+    const now = getCurrentTime();
     const newEntry: TimeEntry = {
       id: crypto.randomUUID(),
       timestamp: now,
@@ -295,7 +297,7 @@ function App() {
 
       const entry = prev.entries[entryIndex];
       const newType = entry.type === "clock-in" ? "clock-out" : "clock-in";
-      const now = new Date();
+      const now = getCurrentTime();
 
       // Create a new entry instead of modifying the existing one
       const newEntry: TimeEntry = {
@@ -405,14 +407,17 @@ function App() {
           }}
         >
           {activeTab === "work-hours-tracker" && (
-            <WorkHoursTracker
-              dayState={dayState}
-              onStartDay={handleStartDay}
-              onEndDay={handleEndDay}
-              onToggleEntry={handleToggleEntry}
-              onUpdateEntry={handleUpdateEntry}
-              onDeleteEntry={handleDeleteEntry}
-            />
+            <>
+              <TimeSimulatorPanel />
+              <WorkHoursTracker
+                dayState={dayState}
+                onStartDay={handleStartDay}
+                onEndDay={handleEndDay}
+                onToggleEntry={handleToggleEntry}
+                onUpdateEntry={handleUpdateEntry}
+                onDeleteEntry={handleDeleteEntry}
+              />
+            </>
           )}
           {activeTab === "discount-calculator" && <DiscountCalculator />}
         </Container>
