@@ -9,6 +9,7 @@ import {
 import { WorkHoursTracker } from "./components/WorkHoursTracker";
 import { DiscountCalculator } from "../src/components/DiscountCalculator";
 import { CustomTabs } from "../src/components/Tabs";
+// @ts-ignore - Dev mode only, intentionally unused in production
 import { TimeSimulatorPanel } from "./components/TimeSimulatorPanel";
 import { TimeEntry, DayState } from "./types";
 import {
