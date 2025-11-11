@@ -7,7 +7,6 @@ import {
   Typography,
   TextField,
   Button,
-  Alert,
   IconButton,
   Collapse,
 } from "@mui/material";
@@ -16,9 +15,7 @@ import { setSimulatedTime, getSimulatedTime } from "../utils/timeSimulator";
 
 export const TimeSimulatorPanel: React.FC = () => {
   const [simulatedDateTime, setSimulatedDateTime] = React.useState<string>("");
-  const [realTimeDisplay, setRealTimeDisplay] = React.useState<Date>(
-    new Date()
-  );
+  const [, setRealTimeDisplay] = React.useState<Date>(new Date());
   const [expanded, setExpanded] = React.useState<boolean>(true);
 
   // Update reference clock display (completely decoupled from simulated time)
