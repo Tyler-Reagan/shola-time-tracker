@@ -1,26 +1,29 @@
 /**
  * Time Simulator Utility
  * Allows overriding the current time for testing purposes
+ * Uses static absolute time (does not advance automatically)
  */
 
-let timeOffset: number | null = null; // Offset in milliseconds from real time
+let staticSimulatedTime: Date | null = null; // Static absolute time (does not advance)
 let isSimulationEnabled: boolean = false;
 
 /**
  * Get the current time (real or simulated)
+ * When simulation is active, returns the static simulated time (does not advance)
  */
 export function getCurrentTime(): Date {
-  if (isSimulationEnabled && timeOffset !== null) {
-    return new Date(Date.now() + timeOffset);
+  if (isSimulationEnabled && staticSimulatedTime !== null) {
+    return new Date(staticSimulatedTime.getTime()); // Return a copy of the static time
   }
   return new Date();
 }
 
 /**
  * Enable time simulation with a specific date/time
+ * Sets a static time that does not advance automatically
  */
 export function setSimulatedTime(date: Date): void {
-  timeOffset = date.getTime() - Date.now();
+  staticSimulatedTime = new Date(date.getTime()); // Store as static absolute time
   isSimulationEnabled = true;
 }
 
@@ -29,7 +32,7 @@ export function setSimulatedTime(date: Date): void {
  */
 export function disableSimulation(): void {
   isSimulationEnabled = false;
-  timeOffset = null;
+  staticSimulatedTime = null;
 }
 
 /**
@@ -41,10 +44,11 @@ export function isSimulationActive(): boolean {
 
 /**
  * Get the simulated time if active, otherwise null
+ * Returns the static simulated time (does not advance)
  */
 export function getSimulatedTime(): Date | null {
-  if (isSimulationEnabled && timeOffset !== null) {
-    return new Date(Date.now() + timeOffset);
+  if (isSimulationEnabled && staticSimulatedTime !== null) {
+    return new Date(staticSimulatedTime.getTime()); // Return a copy of the static time
   }
   return null;
 }

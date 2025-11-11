@@ -1905,9 +1905,6 @@ export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
     <Box
       sx={{ display: "flex", flexDirection: "column", gap: { xs: 1, sm: 2 } }}
     >
-      {/* Time Simulator Panel - Always visible */}
-      <TimeSimulatorPanel />
-
       {/* Date Header */}
       {/* <Typography
         variant="h6"
@@ -1937,6 +1934,9 @@ export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
         formatDuration={formatDuration}
         TrackingPeriodInfo={TrackingPeriodInfo}
       />
+
+      {/* Time Simulator Panel - Between header and entries */}
+      <TimeSimulatorPanel />
 
       {/* Time entries list */}
       <TimeEntriesTable

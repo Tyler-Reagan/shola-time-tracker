@@ -7,55 +7,54 @@ import {
   Typography,
   TextField,
   Button,
-  Chip,
   Alert,
+  IconButton,
+  Collapse,
 } from "@mui/material";
-import {
-  setSimulatedTime,
-  isSimulationActive,
-  getSimulatedTime,
-  getCurrentTime,
-} from "../utils/timeSimulator";
+import { ExpandMore, ExpandLess } from "@mui/icons-material";
+import { setSimulatedTime, getSimulatedTime } from "../utils/timeSimulator";
 
 export const TimeSimulatorPanel: React.FC = () => {
   const [simulatedDateTime, setSimulatedDateTime] = React.useState<string>("");
-  const [currentTimeDisplay, setCurrentTimeDisplay] = React.useState<Date>(
-    getCurrentTime()
+  const [realTimeDisplay, setRealTimeDisplay] = React.useState<Date>(
+    new Date()
   );
+  const [expanded, setExpanded] = React.useState<boolean>(true);
 
+  // Update reference clock display (completely decoupled from simulated time)
   React.useEffect(() => {
-    // Initialize with current time if simulation is not active
-    if (!isSimulationActive()) {
-      const now = getCurrentTime();
-      setSimulatedTime(now);
-      const year = now.getFullYear();
-      const month = String(now.getMonth() + 1).padStart(2, "0");
-      const day = String(now.getDate()).padStart(2, "0");
-      const hours = String(now.getHours()).padStart(2, "0");
-      const minutes = String(now.getMinutes()).padStart(2, "0");
-      setSimulatedDateTime(`${year}-${month}-${day}T${hours}:${minutes}`);
-    } else {
-      const simulated = getSimulatedTime();
-      if (simulated) {
-        const year = simulated.getFullYear();
-        const month = String(simulated.getMonth() + 1).padStart(2, "0");
-        const day = String(simulated.getDate()).padStart(2, "0");
-        const hours = String(simulated.getHours()).padStart(2, "0");
-        const minutes = String(simulated.getMinutes()).padStart(2, "0");
-        setSimulatedDateTime(`${year}-${month}-${day}T${hours}:${minutes}`);
-      }
-    }
+    const interval = setInterval(() => {
+      setRealTimeDisplay(new Date()); // Show real current time as reference
+    }, 1000);
+    return () => clearInterval(interval);
   }, []);
 
-  const handleSetTime = () => {
-    if (simulatedDateTime) {
-      const date = new Date(simulatedDateTime);
-      setSimulatedTime(date);
+  React.useEffect(() => {
+    // Initialize with current simulated time or current real time
+    const simulated = getSimulatedTime();
+    const timeToUse = simulated || new Date();
+    setSimulatedTime(timeToUse);
+
+    const year = timeToUse.getFullYear();
+    const month = String(timeToUse.getMonth() + 1).padStart(2, "0");
+    const day = String(timeToUse.getDate()).padStart(2, "0");
+    const hours = String(timeToUse.getHours()).padStart(2, "0");
+    const minutes = String(timeToUse.getMinutes()).padStart(2, "0");
+    setSimulatedDateTime(`${year}-${month}-${day}T${hours}:${minutes}`);
+  }, []);
+
+  const handleTimeChange = (dateTimeString: string) => {
+    setSimulatedDateTime(dateTimeString);
+    if (dateTimeString) {
+      const date = new Date(dateTimeString);
+      if (!isNaN(date.getTime())) {
+        setSimulatedTime(date);
+      }
     }
   };
 
   const handleAdvanceTime = (minutes: number) => {
-    const current = getSimulatedTime() || getCurrentTime();
+    const current = getSimulatedTime()!;
     const newTime = new Date(current.getTime() + minutes * 60 * 1000);
     setSimulatedTime(newTime);
     const year = newTime.getFullYear();
@@ -65,23 +64,6 @@ export const TimeSimulatorPanel: React.FC = () => {
     const mins = String(newTime.getMinutes()).padStart(2, "0");
     setSimulatedDateTime(`${year}-${month}-${day}T${hours}:${mins}`);
   };
-
-  // Refresh current time display periodically
-  React.useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentTimeDisplay(getCurrentTime());
-      const simulated = getSimulatedTime();
-      if (simulated) {
-        const year = simulated.getFullYear();
-        const month = String(simulated.getMonth() + 1).padStart(2, "0");
-        const day = String(simulated.getDate()).padStart(2, "0");
-        const hours = String(simulated.getHours()).padStart(2, "0");
-        const minutes = String(simulated.getMinutes()).padStart(2, "0");
-        setSimulatedDateTime(`${year}-${month}-${day}T${hours}:${minutes}`);
-      }
-    }, 1000);
-    return () => clearInterval(interval);
-  }, []);
 
   const handleQuickSet = (preset: string) => {
     const now = new Date();
@@ -123,118 +105,186 @@ export const TimeSimulatorPanel: React.FC = () => {
   };
 
   return (
-    <Card sx={{ mb: 2, border: "2px solid", borderColor: "warning.main" }}>
+    <Card sx={{ border: "2px solid", borderColor: "warning.main" }}>
       <CardHeader
+        sx={{
+          py: 1,
+          px: 2,
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          "& .MuiCardHeader-action": {
+            margin: 0,
+            padding: 0,
+          },
+        }}
         title={
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            <Typography variant="h6">Time Simulator</Typography>
-            <Chip
-              label="ACTIVE"
-              color="warning"
-              size="small"
-              sx={{ fontWeight: "bold" }}
-            />
-          </Box>
+          <Typography
+            variant="h6"
+            sx={{
+              fontWeight: "bold",
+              fontSize: { xs: "1.5rem", sm: "2rem", md: "2.125rem" },
+              textAlign: "left",
+              flex: 1,
+            }}
+          >
+            Time Simulator
+          </Typography>
+        }
+        action={
+          <IconButton
+            onClick={() => setExpanded(!expanded)}
+            aria-label="expand or collapse"
+            size="small"
+          >
+            {expanded ? <ExpandLess /> : <ExpandMore />}
+          </IconButton>
         }
       />
-      <CardContent>
-        <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-          <Alert severity="info" sx={{ fontSize: "0.875rem" }}>
-            Current Time: {currentTimeDisplay.toLocaleString()}
-          </Alert>
+      <Collapse in={expanded} timeout="auto" unmountOnExit>
+        <CardContent>
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+            {/* <Alert severity="info" sx={{ fontSize: "0.875rem" }}>
+              Real Time: {realTimeDisplay.toLocaleString()}
+            </Alert> */}
 
-          <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-            <Typography variant="body2" sx={{ fontWeight: "bold" }}>
-              Quick Presets:
-            </Typography>
-            <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-              <Button
-                variant="outlined"
-                size="small"
-                onClick={() => handleQuickSet("monday-9am")}
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+              <Typography variant="body2" sx={{ fontWeight: "bold" }}>
+                Quick Presets:
+              </Typography>
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(3, 1fr)",
+                  gap: 0.5,
+                }}
               >
-                Monday 9am
-              </Button>
-              <Button
-                variant="outlined"
-                size="small"
-                onClick={() => handleQuickSet("wednesday-9am")}
-              >
-                Wednesday 9am
-              </Button>
-              <Button
-                variant="outlined"
-                size="small"
-                onClick={() => handleQuickSet("friday-9am")}
-              >
-                Friday 9am
-              </Button>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => handleQuickSet("monday-9am")}
+                  sx={{ fontSize: "0.75rem", px: 0.5 }}
+                >
+                  Mon 9am
+                </Button>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => handleQuickSet("wednesday-9am")}
+                  sx={{ fontSize: "0.75rem", px: 0.5 }}
+                >
+                  Wed 9am
+                </Button>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => handleQuickSet("friday-9am")}
+                  sx={{ fontSize: "0.75rem", px: 0.5 }}
+                >
+                  Fri 9am
+                </Button>
+              </Box>
             </Box>
-          </Box>
 
-          <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-            <Typography variant="body2" sx={{ fontWeight: "bold" }}>
-              Custom Time:
-            </Typography>
-            <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+              <Typography variant="body2" sx={{ fontWeight: "bold" }}>
+                Custom Time:
+              </Typography>
               <TextField
                 type="datetime-local"
                 value={simulatedDateTime}
-                onChange={(e) => setSimulatedDateTime(e.target.value)}
+                onChange={(e) => handleTimeChange(e.target.value)}
                 size="small"
-                sx={{ flex: 1 }}
+                fullWidth
+                inputProps={{
+                  min: "2000-01-01T00:00", // Allow any date from year 2000 onwards
+                }}
                 InputLabelProps={{
                   shrink: true,
                 }}
               />
-              <Button
-                variant="contained"
-                onClick={handleSetTime}
-                disabled={!simulatedDateTime}
-                size="small"
-              >
-                Set
-              </Button>
             </Box>
-          </Box>
 
-          <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-            <Typography variant="body2" sx={{ fontWeight: "bold" }}>
-              Advance Time:
-            </Typography>
-            <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-              <Button
-                variant="outlined"
-                size="small"
-                onClick={() => handleAdvanceTime(15)}
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+              <Typography variant="body2" sx={{ fontWeight: "bold" }}>
+                Adjust Time:
+              </Typography>
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(4, 1fr)",
+                  gap: 0.5,
+                }}
               >
-                +15 min
-              </Button>
-              <Button
-                variant="outlined"
-                size="small"
-                onClick={() => handleAdvanceTime(30)}
-              >
-                +30 min
-              </Button>
-              <Button
-                variant="outlined"
-                size="small"
-                onClick={() => handleAdvanceTime(60)}
-              >
-                +1 hour
-              </Button>
-              <Button
-                variant="outlined"
-                size="small"
-                onClick={() => handleAdvanceTime(120)}
-              >
-                +2 hours
-              </Button>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => handleAdvanceTime(-15)}
+                  sx={{ minWidth: "auto", fontSize: "0.75rem", px: 0.5 }}
+                >
+                  -15m
+                </Button>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => handleAdvanceTime(-30)}
+                  sx={{ minWidth: "auto", fontSize: "0.75rem", px: 0.5 }}
+                >
+                  -30m
+                </Button>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => handleAdvanceTime(-60)}
+                  sx={{ minWidth: "auto", fontSize: "0.75rem", px: 0.5 }}
+                >
+                  -1h
+                </Button>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => handleAdvanceTime(-120)}
+                  sx={{ minWidth: "auto", fontSize: "0.75rem", px: 0.5 }}
+                >
+                  -2h
+                </Button>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => handleAdvanceTime(15)}
+                  sx={{ minWidth: "auto", fontSize: "0.75rem", px: 0.5 }}
+                >
+                  +15m
+                </Button>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => handleAdvanceTime(30)}
+                  sx={{ minWidth: "auto", fontSize: "0.75rem", px: 0.5 }}
+                >
+                  +30m
+                </Button>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => handleAdvanceTime(60)}
+                  sx={{ minWidth: "auto", fontSize: "0.75rem", px: 0.5 }}
+                >
+                  +1h
+                </Button>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => handleAdvanceTime(120)}
+                  sx={{ minWidth: "auto", fontSize: "0.75rem", px: 0.5 }}
+                >
+                  +2h
+                </Button>
+              </Box>
             </Box>
           </Box>
-        </Box>
-      </CardContent>
+        </CardContent>
+      </Collapse>
     </Card>
   );
 };
