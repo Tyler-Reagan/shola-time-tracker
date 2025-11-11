@@ -32,6 +32,7 @@ import {
 } from "@mui/icons-material";
 import { DayState } from "../types";
 import { getCurrentTime, isSimulationActive } from "../utils/timeSimulator";
+import { TimeSimulatorPanel } from "./TimeSimulatorPanel";
 
 /**
  * Component: WorkHoursTrackerHeader
@@ -96,7 +97,7 @@ const WorkHoursTrackerHeader: React.FC<WorkHoursTrackerHeaderProps> = ({
                 textAlign: { xs: "center", sm: "left" },
               }}
             >
-              Work Hours Tracker
+              Work Hours Planner
             </Typography>
             <Typography
               variant="body1"
@@ -105,7 +106,7 @@ const WorkHoursTrackerHeader: React.FC<WorkHoursTrackerHeaderProps> = ({
                 textAlign: { xs: "center", sm: "left" },
               }}
             >
-              Times are with respect to the tracking period: <br />
+              Plan your work schedule using simulated time: <br />
               <strong>{formatTrackingPeriodLabel()}</strong>
             </Typography>
           </>
@@ -1904,6 +1905,9 @@ export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
     <Box
       sx={{ display: "flex", flexDirection: "column", gap: { xs: 1, sm: 2 } }}
     >
+      {/* Time Simulator Panel - Always visible */}
+      <TimeSimulatorPanel />
+
       {/* Date Header */}
       {/* <Typography
         variant="h6"
@@ -2002,7 +2006,7 @@ export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
                 fontSize: { xs: "1.25rem", sm: "1.5rem" },
               }}
             >
-              Ready to start your work day?
+              Ready to plan your work day?
             </Typography>
             <Typography
               variant="body1"
@@ -2014,8 +2018,8 @@ export const WorkHoursTracker: React.FC<WorkHoursTrackerProps> = ({
                 px: { xs: 2, sm: 0 },
               }}
             >
-              Click "Start New Day" above to begin tracking your work hours for
-              the day.
+              Use the time simulator above to set your desired time, then click
+              "Start New Day" to begin planning your work schedule.
             </Typography>
           </CardContent>
         </Card>

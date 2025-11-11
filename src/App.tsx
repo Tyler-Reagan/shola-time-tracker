@@ -239,8 +239,8 @@ const darkTheme = createTheme({
 
 function App() {
   const [activeTab, setActiveTab] = useState<
-    "work-hours-tracker" | "discount-calculator"
-  >("work-hours-tracker");
+    "work-hours-planner" | "discount-calculator"
+  >("work-hours-planner");
 
   // Initialize dayState from localStorage if available
   const [dayState, setDayState] = useState<DayState>(() => {
@@ -381,7 +381,7 @@ function App() {
   };
 
   const tabs = [
-    { id: "work-hours-tracker", label: "Work Hours Tracker" },
+    { id: "work-hours-planner", label: "Work Hours Planner" },
     { id: "discount-calculator", label: "Discount Calculator" },
   ];
 
@@ -400,7 +400,7 @@ function App() {
           tabs={tabs}
           activeTab={activeTab}
           onTabChange={(tabId) =>
-            setActiveTab(tabId as "work-hours-tracker" | "discount-calculator")
+            setActiveTab(tabId as "work-hours-planner" | "discount-calculator")
           }
         />
 
@@ -414,19 +414,15 @@ function App() {
             maxWidth: { xs: "100%", sm: "100%", md: "lg" },
           }}
         >
-          {activeTab === "work-hours-tracker" && (
-            <>
-              {/* ONLY ENABLE THIS WHEN DEBUGGING AND TESTING */}
-              {/* <TimeSimulatorPanel /> */}
-              <WorkHoursTracker
-                dayState={dayState}
-                onStartDay={handleStartDay}
-                onEndDay={handleEndDay}
-                onToggleEntry={handleToggleEntry}
-                onUpdateEntry={handleUpdateEntry}
-                onDeleteEntry={handleDeleteEntry}
-              />
-            </>
+          {activeTab === "work-hours-planner" && (
+            <WorkHoursTracker
+              dayState={dayState}
+              onStartDay={handleStartDay}
+              onEndDay={handleEndDay}
+              onToggleEntry={handleToggleEntry}
+              onUpdateEntry={handleUpdateEntry}
+              onDeleteEntry={handleDeleteEntry}
+            />
           )}
           {activeTab === "discount-calculator" && <DiscountCalculator />}
         </Container>

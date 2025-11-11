@@ -12,7 +12,6 @@ import {
 } from "@mui/material";
 import {
   setSimulatedTime,
-  disableSimulation,
   isSimulationActive,
   getSimulatedTime,
   getCurrentTime,
@@ -20,19 +19,31 @@ import {
 
 export const TimeSimulatorPanel: React.FC = () => {
   const [simulatedDateTime, setSimulatedDateTime] = React.useState<string>("");
-  const [isActive, setIsActive] = React.useState(false);
-  const [currentTimeDisplay, setCurrentTimeDisplay] = React.useState<Date>(getCurrentTime());
+  const [currentTimeDisplay, setCurrentTimeDisplay] = React.useState<Date>(
+    getCurrentTime()
+  );
 
   React.useEffect(() => {
-    setIsActive(isSimulationActive());
-    const simulated = getSimulatedTime();
-    if (simulated) {
-      const year = simulated.getFullYear();
-      const month = String(simulated.getMonth() + 1).padStart(2, "0");
-      const day = String(simulated.getDate()).padStart(2, "0");
-      const hours = String(simulated.getHours()).padStart(2, "0");
-      const minutes = String(simulated.getMinutes()).padStart(2, "0");
+    // Initialize with current time if simulation is not active
+    if (!isSimulationActive()) {
+      const now = getCurrentTime();
+      setSimulatedTime(now);
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, "0");
+      const day = String(now.getDate()).padStart(2, "0");
+      const hours = String(now.getHours()).padStart(2, "0");
+      const minutes = String(now.getMinutes()).padStart(2, "0");
       setSimulatedDateTime(`${year}-${month}-${day}T${hours}:${minutes}`);
+    } else {
+      const simulated = getSimulatedTime();
+      if (simulated) {
+        const year = simulated.getFullYear();
+        const month = String(simulated.getMonth() + 1).padStart(2, "0");
+        const day = String(simulated.getDate()).padStart(2, "0");
+        const hours = String(simulated.getHours()).padStart(2, "0");
+        const minutes = String(simulated.getMinutes()).padStart(2, "0");
+        setSimulatedDateTime(`${year}-${month}-${day}T${hours}:${minutes}`);
+      }
     }
   }, []);
 
@@ -40,48 +51,37 @@ export const TimeSimulatorPanel: React.FC = () => {
     if (simulatedDateTime) {
       const date = new Date(simulatedDateTime);
       setSimulatedTime(date);
-      setIsActive(true);
     }
-  };
-
-  const handleDisable = () => {
-    disableSimulation();
-    setIsActive(false);
-    setSimulatedDateTime("");
   };
 
   const handleAdvanceTime = (minutes: number) => {
-    if (isActive) {
-      const current = getSimulatedTime() || getCurrentTime();
-      const newTime = new Date(current.getTime() + minutes * 60 * 1000);
-      setSimulatedTime(newTime);
-      const year = newTime.getFullYear();
-      const month = String(newTime.getMonth() + 1).padStart(2, "0");
-      const day = String(newTime.getDate()).padStart(2, "0");
-      const hours = String(newTime.getHours()).padStart(2, "0");
-      const mins = String(newTime.getMinutes()).padStart(2, "0");
-      setSimulatedDateTime(`${year}-${month}-${day}T${hours}:${mins}`);
-    }
+    const current = getSimulatedTime() || getCurrentTime();
+    const newTime = new Date(current.getTime() + minutes * 60 * 1000);
+    setSimulatedTime(newTime);
+    const year = newTime.getFullYear();
+    const month = String(newTime.getMonth() + 1).padStart(2, "0");
+    const day = String(newTime.getDate()).padStart(2, "0");
+    const hours = String(newTime.getHours()).padStart(2, "0");
+    const mins = String(newTime.getMinutes()).padStart(2, "0");
+    setSimulatedDateTime(`${year}-${month}-${day}T${hours}:${mins}`);
   };
 
   // Refresh current time display periodically
   React.useEffect(() => {
     const interval = setInterval(() => {
       setCurrentTimeDisplay(getCurrentTime());
-      if (isActive) {
-        const simulated = getSimulatedTime();
-        if (simulated) {
-          const year = simulated.getFullYear();
-          const month = String(simulated.getMonth() + 1).padStart(2, "0");
-          const day = String(simulated.getDate()).padStart(2, "0");
-          const hours = String(simulated.getHours()).padStart(2, "0");
-          const minutes = String(simulated.getMinutes()).padStart(2, "0");
-          setSimulatedDateTime(`${year}-${month}-${day}T${hours}:${minutes}`);
-        }
+      const simulated = getSimulatedTime();
+      if (simulated) {
+        const year = simulated.getFullYear();
+        const month = String(simulated.getMonth() + 1).padStart(2, "0");
+        const day = String(simulated.getDate()).padStart(2, "0");
+        const hours = String(simulated.getHours()).padStart(2, "0");
+        const minutes = String(simulated.getMinutes()).padStart(2, "0");
+        setSimulatedDateTime(`${year}-${month}-${day}T${hours}:${minutes}`);
       }
     }, 1000);
     return () => clearInterval(interval);
-  }, [isActive]);
+  }, []);
 
   const handleQuickSet = (preset: string) => {
     const now = new Date();
@@ -114,7 +114,6 @@ export const TimeSimulatorPanel: React.FC = () => {
     }
 
     setSimulatedTime(date);
-    setIsActive(true);
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, "0");
     const day = String(date.getDate()).padStart(2, "0");
@@ -128,15 +127,13 @@ export const TimeSimulatorPanel: React.FC = () => {
       <CardHeader
         title={
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            <Typography variant="h6">Time Simulator (Dev Mode)</Typography>
-            {isActive && (
-              <Chip
-                label="ACTIVE"
-                color="warning"
-                size="small"
-                sx={{ fontWeight: "bold" }}
-              />
-            )}
+            <Typography variant="h6">Time Simulator</Typography>
+            <Chip
+              label="ACTIVE"
+              color="warning"
+              size="small"
+              sx={{ fontWeight: "bold" }}
+            />
           </Box>
         }
       />
@@ -201,56 +198,43 @@ export const TimeSimulatorPanel: React.FC = () => {
             </Box>
           </Box>
 
-          {isActive && (
-            <>
-              <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                <Typography variant="body2" sx={{ fontWeight: "bold" }}>
-                  Advance Time:
-                </Typography>
-                <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    onClick={() => handleAdvanceTime(15)}
-                  >
-                    +15 min
-                  </Button>
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    onClick={() => handleAdvanceTime(30)}
-                  >
-                    +30 min
-                  </Button>
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    onClick={() => handleAdvanceTime(60)}
-                  >
-                    +1 hour
-                  </Button>
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    onClick={() => handleAdvanceTime(120)}
-                  >
-                    +2 hours
-                  </Button>
-                </Box>
-              </Box>
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+            <Typography variant="body2" sx={{ fontWeight: "bold" }}>
+              Advance Time:
+            </Typography>
+            <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
               <Button
                 variant="outlined"
-                color="error"
-                onClick={handleDisable}
                 size="small"
+                onClick={() => handleAdvanceTime(15)}
               >
-                Disable Simulation (Use Real Time)
+                +15 min
               </Button>
-            </>
-          )}
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={() => handleAdvanceTime(30)}
+              >
+                +30 min
+              </Button>
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={() => handleAdvanceTime(60)}
+              >
+                +1 hour
+              </Button>
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={() => handleAdvanceTime(120)}
+              >
+                +2 hours
+              </Button>
+            </Box>
+          </Box>
         </Box>
       </CardContent>
     </Card>
   );
 };
-
